@@ -1,0 +1,185 @@
+"use client"
+
+import { Player, type PlayerRef } from "@remotion/player"
+import { ScanIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { cn } from "cn"
+
+import { clipEnd } from "@/lib/project/edit"
+import { Main, type MainProps } from "@/remotion/main"
+import { useEditorStore, useSelectedClip } from "@/stores/editor-store"
+
+// Space around the video. The zoom control floats over the canvas, so no room is reserved for it.
+const PAD = { x: 16, top: 16, bottom: 16 }
+const ZOOM_STEPS = [0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2]
+
+/** The preview: Remotion Player, zoom/fit and the selection outline. Playback lives in the timeline toolbar. */
+export function Canvas() {
+  const doc = useEditorStore((state) => state.data.doc)
+  const durationInFrames = useEditorStore((state) => state.data.durationInFrames)
+  const width = useEditorStore((state) => state.width)
+  const height = useEditorStore((state) => state.height)
+  const fps = useEditorStore((state) => state.fps)
+  const select = useEditorStore((state) => state.select)
+
+  const containerRef = useRef<HTMLDivElement>(null)
+  const available = useElementSize(containerRef)
+  const [zoom, setZoom] = useState<number | "fit">("fit")
+
+  const fitScale = available
+    ? Math.max(0.05, Math.min((available.width - PAD.x * 2) / width, (available.height - PAD.top - PAD.bottom) / height))
+    : 0
+  const scale = zoom === "fit" ? fitScale : zoom
+
+  const playerRef = usePlayerSync()
+  const inputProps = useMemo<MainProps>(() => ({ doc }), [doc])
+
+  function step(direction: 1 | -1) {
+    const current = scale
+    const next = direction > 0 ? ZOOM_STEPS.find((z) => z > current + 0.001) : ZOOM_STEPS.findLast((z) => z < current - 0.001)
+    if (next) setZoom(next)
+  }
+
+  return (
+    <section
+      ref={containerRef}
+      className="relative min-w-0 flex-1 overflow-hidden rounded-[22px] border border-border bg-(--editor-canvas) bg-[radial-gradient(var(--editor-dots)_1px,transparent_1px)] bg-size-[18px_18px]"
+    >
+      {/* Scrolls when zoomed past fit; the zoom control stays put. */}
+      {available && (
+        <div
+          className="absolute inset-0 grid place-items-center overflow-auto"
+          style={{ padding: `${PAD.top}px ${PAD.x}px ${PAD.bottom}px` }}
+          onPointerDown={(event) => event.target === event.currentTarget && select(null)}
+        >
+          <div className="relative" style={{ width: width * scale, height: height * scale }}>
+            <Player
+              ref={playerRef}
+              component={Main}
+              inputProps={inputProps}
+              durationInFrames={Math.max(1, durationInFrames)}
+              fps={fps}
+              compositionWidth={width}
+              compositionHeight={height}
+              style={{ width: width * scale, height: height * scale, borderRadius: 14, overflow: "hidden" }}
+              controls={false}
+              clickToPlay={false}
+              doubleClickToFullscreen={false}
+              spaceKeyToPlayOrPause={false}
+              // Play waits for the browser's audio to start (up to ~1s). This starts it on the first
+              // click or key press and keeps it running while paused, so Play responds at once.
+              _experimentalKeepAudioContextAlive
+              // Stop on the last frame (where the last clip ends) instead of jumping back to 0:00.
+              moveToBeginningWhenEnded={false}
+              acknowledgeRemotionLicense
+            />
+            <SelectionOutline scale={scale} />
+          </div>
+        </div>
+      )}
+
+      <div className="absolute bottom-2 left-2 z-10 flex h-8 items-center gap-0.5 rounded-full border border-border bg-card/90 px-1 shadow-md backdrop-blur">
+        <RoundButton label="Zoom out" onClick={() => step(-1)}>
+          <ZoomOutIcon className="size-3.5" />
+        </RoundButton>
+        <span className="w-10 text-center text-xs tabular-nums">{Math.round(scale * 100)}%</span>
+        <RoundButton label="Zoom in" onClick={() => step(1)}>
+          <ZoomInIcon className="size-3.5" />
+        </RoundButton>
+        <span className="mx-0.5 h-4 w-px bg-border" />
+        <button
+          type="button"
+          onClick={() => setZoom("fit")}
+          className={cn(
+            "flex h-6 items-center gap-1 rounded-full px-2 text-xs transition-colors hover:bg-muted",
+            zoom === "fit" ? "text-foreground" : "text-muted-foreground"
+          )}
+        >
+          <ScanIcon className="size-3.5" />
+          Fit
+        </button>
+      </div>
+    </section>
+  )
+}
+
+/** Mirrors the Player into the store: the ref (for seek/play) and its frame/playing events. */
+// A callback ref (not useRef): the Player mounts only after the canvas is measured.
+function usePlayerSync() {
+  const [player, playerRef] = useState<PlayerRef | null>(null)
+  const { setPlayer, setFrame, setPlaying } = useEditorStore.getState()
+
+  useEffect(() => {
+    if (!player) return
+    setPlayer(player)
+    player.seekTo(useEditorStore.getState().frame)
+
+    const onFrame = (event: { detail: { frame: number } }) => setFrame(event.detail.frame)
+    const onPlay = () => setPlaying(true)
+    const onPause = () => setPlaying(false)
+    player.addEventListener("frameupdate", onFrame)
+    player.addEventListener("seeked", onFrame)
+    player.addEventListener("play", onPlay)
+    player.addEventListener("pause", onPause)
+    player.addEventListener("ended", onPause)
+    return () => {
+      player.removeEventListener("frameupdate", onFrame)
+      player.removeEventListener("seeked", onFrame)
+      player.removeEventListener("play", onPlay)
+      player.removeEventListener("pause", onPause)
+      player.removeEventListener("ended", onPause)
+      setPlayer(null)
+    }
+  }, [player, setPlayer, setFrame, setPlaying])
+
+  return playerRef
+}
+
+/** Outlines the selected clip while it's on screen (no canvas dragging in v1). */
+function SelectionOutline({ scale }: { scale: number }) {
+  const clip = useSelectedClip()
+  const frame = useEditorStore((state) => state.frame)
+  if (!clip || clip.type === "audio" || frame < clip.from || frame >= clipEnd(clip)) return null
+
+  const { x, y, width, height, rotation, scale: clipScale } = clip.transform
+  return (
+    <div
+      className="pointer-events-none absolute rounded-[3px] outline-2 outline-(--editor-accent)"
+      style={{
+        left: x * scale,
+        top: y * scale,
+        width: width * scale,
+        height: height * scale,
+        transform: `rotate(${rotation}deg) scale(${clipScale})`,
+      }}
+    />
+  )
+}
+
+function RoundButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="grid size-6 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    >
+      {children}
+    </button>
+  )
+}
+
+function useElementSize(ref: React.RefObject<HTMLElement | null>) {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+    const observer = new ResizeObserver(([entry]) =>
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ref])
+  return size
+}

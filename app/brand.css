@@ -1,0 +1,105 @@
+/*
+ * motion brand layer.
+ *
+ * Kept out of globals.css on purpose: `shadcn init` / `shadcn add` may rewrite
+ * globals.css, but never this file. app/layout.tsx imports it AFTER globals.css,
+ * so these tokens override the shadcn defaults.
+ */
+
+:root {
+  --radius: 0.875rem;
+
+  --background: #f6f5f3;
+  --foreground: #18181a;
+  --card: #ffffff;
+  --card-foreground: #18181a;
+  --popover: #ffffff;
+  --popover-foreground: #18181a;
+  --primary: #ff5c1a;
+  --primary-foreground: #ffffff;
+  --secondary: #ecebe8;
+  --secondary-foreground: #18181a;
+  --muted: #efeeeb;
+  --muted-foreground: #6b6b72;
+  --accent: #ecebe8;
+  --accent-foreground: #18181a;
+  --border: rgb(24 24 26 / 0.08);
+  --input: rgb(24 24 26 / 0.12);
+  --ring: #ff5c1a;
+
+  /* Filled fields (design inputs are solid, not outlined) */
+  --field: #ecebe8;
+  /* A card that sits one step above --card (the Connect Claude Code card) */
+  --card-raised: #ffffff;
+
+  /* 3D pill buttons */
+  --pill-primary-from: #ff7a33;
+  --pill-primary-to: #ff5512;
+  --pill-primary-edge: #c8400b;
+  --pill-primary-glow: rgb(255 92 26 / 0.45);
+  --pill-secondary: #e4e3e0;
+  --pill-secondary-edge: #c6c5c1;
+  --pill-secondary-foreground: #18181a;
+
+  --page-glow: rgb(255 92 26 / 0.07);
+
+  /* Editor: selection, playhead and active tools are blue in the design */
+  --editor-accent: #3b82f6;
+  --editor-canvas: #ebeae7;
+  --editor-dots: rgb(24 24 26 / 0.12);
+
+  /* Clip colours by type (timeline blocks and track chips) */
+  --clip-code: #4fc4b0;
+  --clip-text: #8b5cf6;
+  --clip-video: #f29b38;
+  --clip-image: #3b82f6;
+  --clip-audio: #3fbf7f;
+}
+
+.dark {
+  --background: #18181a;
+  --foreground: #f4f4f5;
+  --card: #242426;
+  --card-foreground: #f4f4f5;
+  --popover: #242426;
+  --popover-foreground: #f4f4f5;
+  --primary: #ff5c1a;
+  --primary-foreground: #ffffff;
+  --secondary: #2e2e31;
+  --secondary-foreground: #f4f4f5;
+  --muted: #2a2a2d;
+  --muted-foreground: #a1a1a9;
+  --accent: #2e2e31;
+  --accent-foreground: #f4f4f5;
+  --border: rgb(255 255 255 / 0.07);
+  --input: rgb(255 255 255 / 0.09);
+  --ring: #ff5c1a;
+
+  --field: #1e1e20;
+  --card-raised: #2d2d30;
+
+  --pill-secondary: #38383c;
+  --pill-secondary-edge: #1f1f22;
+  --pill-secondary-foreground: #f4f4f5;
+
+  --page-glow: rgb(255 92 26 / 0.06);
+
+  --editor-canvas: #1d1d20;
+  --editor-dots: rgb(255 255 255 / 0.07);
+}
+
+/* Tailwind v4 resets buttons to the default cursor; every clickable control gets the pointer. */
+@layer base {
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="radio"],
+  [role="menuitem"],
+  label[for] {
+    cursor: pointer;
+  }
+}
+
+body {
+  background-image: radial-gradient(1100px 480px at 50% -12%, var(--page-glow), transparent 70%);
+  background-attachment: fixed;
+}

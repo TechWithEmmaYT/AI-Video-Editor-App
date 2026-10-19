@@ -1,69 +1,97 @@
-import Image from "next/image";
+import Link from "next/link"
+import { cn } from "cn"
 
-export default function Home() {
+import { PillButton } from "@/components/brand/pill-button"
+import { SiteHeader } from "@/components/nav/site-header"
+import { ThemeToggle } from "@/components/nav/theme-toggle"
+
+/*
+ * Tilted 3D prompt pills floating around the hero, as in _designs/image.png.
+ *
+ * Positions are measured from the centre of the hero in units of the title's font size
+ * (--hero-fs), not in % of the container, so they always sit in the gutter beside the text:
+ * line 1 ("Automate it.") is about 6.6 × --hero-fs wide, the paragraph is max 576px wide.
+ * Long pills go next to line 1 (the narrower line); short ones next to the paragraph.
+ * The longest pill only fits from 1440px up.
+ */
+const PROMPTS = [
+  {
+    text: "“make the hook more aggressive”",
+    className:
+      "hidden min-[1440px]:block top-[calc(var(--hero-fs)*0.18)] right-[calc(50%+var(--hero-fs)*3.45+12px)] -rotate-[7deg] bg-[#ef4b4b] text-white shadow-[0_6px_0_0_#b0302f]",
+  },
+  {
+    text: "“adapt this to portrait”",
+    className:
+      "top-[calc(var(--hero-fs)*-0.62)] left-[calc(50%+var(--hero-fs)*0.4)] -rotate-[3deg] bg-[#2f7cf0] text-white shadow-[0_6px_0_0_#1d57b5]",
+  },
+  {
+    text: "“slam it in”",
+    className:
+      "top-[calc(var(--hero-fs)*0.22)] left-[calc(50%+var(--hero-fs)*3.45+20px)] rotate-[6deg] bg-[#f5c518] text-[#3a2c00] shadow-[0_6px_0_0_#bf960a]",
+  },
+  {
+    text: "“orange, please”",
+    className:
+      "top-[calc(var(--hero-fs)*1.84+56px)] right-[calc(50%+300px)] rotate-[5deg] bg-[#ff5c1a] text-white shadow-[0_6px_0_0_#c23e09]",
+  },
+  {
+    text: "“Inter Tight, everywhere”",
+    className:
+      "top-[calc(var(--hero-fs)*1.84+40px)] left-[calc(50%+300px)] rotate-[3deg] bg-[#8f4ef0] text-white shadow-[0_6px_0_0_#6831ba]",
+  },
+]
+
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <div className="flex min-h-svh flex-col overflow-x-clip px-4 py-5 sm:px-6">
+      <SiteHeader>
+        <ThemeToggle />
+        <PillButton variant="ghost" size="sm" nativeButton={false} render={<Link href="/sign-in" />}>
+          Sign in
+        </PillButton>
+        <PillButton size="sm" nativeButton={false} render={<Link href="/sign-up" />}>
+          Get started
+        </PillButton>
+      </SiteHeader>
+
+      <main className="flex flex-1 flex-col items-center justify-center py-28 text-center [--hero-fs:clamp(3.25rem,8.5vw,6.75rem)]">
+        <div className="relative w-full">
+          {/* Only from xl up: below that the gutters are too narrow and the pills would cover the text. */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 hidden xl:block">
+            {PROMPTS.map((prompt) => (
+              <span
+                key={prompt.text}
+                className={cn(
+                  "absolute rounded-full px-5 py-2 font-mono text-[13px] font-bold whitespace-nowrap italic",
+                  prompt.className
+                )}
+              >
+                {prompt.text}
+              </span>
+            ))}
+          </div>
+
+          <h1 className="relative font-(family-name:--font-display) text-(length:--hero-fs) leading-[0.92] font-black tracking-[-0.045em] [word-spacing:0.04em]">
+            Automate it.
+            <br />
+            Keep the look.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="relative mx-auto mt-8 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
+            An MCP for Claude Code. Claude edits your video live: your copy, your fonts, your colours, your assets.
+            Every frame stays yours to edit.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <PillButton size="lg" nativeButton={false} render={<Link href="/sign-up" />}>
+            Get started
+          </PillButton>
+          <PillButton variant="secondary" size="lg" nativeButton={false} render={<Link href="/app" />}>
+            New project
+          </PillButton>
         </div>
       </main>
     </div>
-  );
+  )
 }
