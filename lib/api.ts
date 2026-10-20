@@ -234,3 +234,16 @@ export async function listApiKeysQueryFn(): Promise<ApiKeySummary[]> {
 export async function revokeApiKeyMutationFn(keyId: string) {
   return unwrap(await authClient.apiKey.delete({ keyId }), "Couldn't revoke the key.")
 }
+
+/**
+ * Disconnects Claude Code: revokes every key, so its next request fails, and clears the
+ * last-seen time so the status doesn't keep reading "Connected". Returns how many it revoked.
+ */
+export async function disconnectClaudeMutationFn() {
+  const keys = await listApiKeysQueryFn()
+  for (const key of keys) {
+    await revokeApiKeyMutationFn(key.id)
+  }
+  await api.delete("/claude/status")
+  return keys.length
+}

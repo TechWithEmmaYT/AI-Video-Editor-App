@@ -1,0 +1,164 @@
+import "server-only"
+
+import type { McpServer } from "@modelcontextprotocol/server"
+import { z } from "zod"
+
+import { applyAgentEdit } from "@/lib/agent/apply"
+import { markEmphasis, splitPhrases, wordsIn } from "@/lib/agent/captions"
+import { addClipOps } from "@/lib/agent/clip-spec"
+import { AgentError, agentUserId, handled, text } from "@/lib/agent/context"
+import { resolveProject } from "@/lib/agent/resolve"
+import { findBuiltinElement } from "@/lib/elements/builtin"
+import { getUserMedia } from "@/lib/media-transcript"
+import { MAX_SECONDS } from "@/lib/project/formats"
+import { formatTimestamp } from "@/lib/transcript"
+
+/** How many captions one call will lay down, so a long file can't fill the timeline by accident. */
+const MAX_PHRASES = 240
+
+export function registerCaptionTools(server: McpServer) {
+  server.registerTool(
+    "add_captions",
+    {
+      title: "Caption a whole stretch of speech",
+      description: [
+        "Lays a Kinetic Caption clip for every phrase in a media file's transcript, with each word's time filled in — the whole caption track in one call, instead of one add_clip per phrase.",
+        "Needs a transcript on the media file (get_media_transcript shows whether there is one).",
+        "`style` is the look: the same params as the Kinetic Caption element, set the same on every caption. get_guide({ topic: \"briefs\" }) gives the style for an edit.",
+        "Returns how many captions it added and the range they cover.",
+      ].join(" "),
+      inputSchema: z.object({
+        mediaId: z.string().min(1).max(64).describe("The speaker's media file (a clip's mediaId)."),
+        clipId: z
+          .string()
+          .min(1)
+          .max(64)
+          .optional()
+          .describe("The clip playing that file, used to turn source time into timeline time. Default: the first clip using this media."),
+        from: z.number().min(0).optional().describe("Start of the stretch to caption, in seconds of the source file. Default: the beginning."),
+        to: z.number().min(0).optional().describe("End of the stretch, in seconds of the source file. Default: the end."),
+        maxWords: z.number().int().min(1).max(12).default(4).describe("Most words in one caption. Phrases also break at sentence ends and pauses."),
+        linesPerPhrase: z.number().int().min(1).max(3).default(1).describe('Lines stacked in one caption clip (for mode "lines").'),
+        pauseSeconds: z.number().min(0.05).max(2).default(0.45).describe("A gap this long or longer always ends a phrase."),
+        emphasis: z.boolean().default(true).describe("Mark one word per phrase as the emphasis word."),
+        style: z.record(z.string(), z.unknown()).default({}).describe("Kinetic Caption params: font, weight, color, mode, highlight, animation…"),
+        box: z
+          .object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() })
+          .partial()
+          .optional()
+          .describe("Where the captions sit. Default: the element's caption box (top third)."),
+        track: z.union([z.enum(["auto", "new-top"]), z.string().min(1).max(64)]).default("new-top").describe("All the captions go on this one track."),
+        projectId: z.string().min(1).max(64).optional().describe("Defaults to the project open in the editor."),
+      }),
+    },
+    handled(
+      async (
+        input: {
+          mediaId: string
+          clipId?: string
+          from?: number
+          to?: number
+          maxWords: number
+          linesPerPhrase: number
+          pauseSeconds: number
+          emphasis: boolean
+          style: Record<string, unknown>
+          box?: { x?: number; y?: number; width?: number; height?: number }
+          track: string
+          projectId?: string
+        },
+        ctx
+      ) => {
+        const userId = agentUserId(ctx)
+        const project = await resolveProject(userId, input.projectId)
+
+        const media = await getUserMedia(userId, input.mediaId)
+        if (!media || media.projectId !== project.id) {
+          throw new AgentError(`No media file "${input.mediaId}" in this project. list_media shows them.`)
+        }
+        if (!media.transcript) {
+          throw new AgentError(
+            `"${media.name}" has no transcript yet, so there are no word times to caption with. Ask the user to add one from its card in the Media tab: Generate with ImageKit, Upload .srt/.vtt, or Paste.`
+          )
+        }
+
+        // The clip decides where a source second lands on the timeline.
+        const speaker = input.clipId
+          ? project.doc.clips.find((clip) => clip.id === input.clipId)
+          : project.doc.clips.find((clip) => "mediaId" in clip && clip.mediaId === input.mediaId)
+        if (!speaker) throw new AgentError(`No clip in this project plays "${media.name}" yet. Add it first, then caption it.`)
+        const trimStart = "trimStartFrames" in speaker ? speaker.trimStartFrames : 0
+
+        const from = input.from ?? 0
+        const to = input.to ?? media.durationSec ?? MAX_SECONDS
+        const words = wordsIn(media.transcript, from, to)
+        if (words.length === 0) throw new AgentError(`The transcript has nothing between ${formatTimestamp(from)} and ${formatTimestamp(to)}.`)
+
+        const phrases = splitPhrases(words, {
+          maxWords: input.maxWords,
+          pauseSeconds: input.pauseSeconds,
+          linesPerPhrase: input.linesPerPhrase,
+        }).map((phrase) => (input.emphasis ? markEmphasis(phrase) : phrase))
+
+        if (phrases.length > MAX_PHRASES) {
+          throw new AgentError(
+            `That stretch would make ${phrases.length} captions, past the ${MAX_PHRASES} one call adds. Caption it in parts with from/to.`
+          )
+        }
+
+        const element = findBuiltinElement("kinetic-caption")
+        if (!element) throw new AgentError("The Kinetic Caption element is missing.")
+
+        // Source second → timeline second, through the clip that plays the file.
+        const onTimeline = (sourceSeconds: number) => (speaker.from - trimStart) / project.fps + sourceSeconds
+
+        let added = 0
+        let track = input.track
+        await applyAgentEdit(userId, project.id, (state) => {
+          const ops = []
+          for (const [index, phrase] of phrases.entries()) {
+            const next = phrases[index + 1]
+            // A caption holds until the next one starts, or a beat past its last word at a pause.
+            const until = next ? Math.min(next.start, phrase.end + 0.3) : phrase.end + 0.3
+            const at = onTimeline(phrase.start)
+            const duration = Math.max(0.6, until - phrase.start)
+            if (at + duration > MAX_SECONDS) break
+
+            const result = addClipOps(
+              state,
+              {
+                kind: "element",
+                elementId: element.id,
+                at,
+                duration,
+                params: { ...input.style, text: phrase.text, times: phrase.times },
+                box: input.box,
+                // Every caption lands on the same track: the first makes it, the rest join it.
+                track,
+                animateIn: undefined,
+                animateInFrames: undefined,
+                animateOut: undefined,
+                animateOutFrames: undefined,
+              },
+              { width: project.width, height: project.height, newId: () => crypto.randomUUID(), element }
+            )
+            ops.push(...result.ops)
+            // Ops aren't applied until the whole batch is built, so take the track from the first one.
+            if (index === 0) {
+              const addTrack = result.ops.find((op) => op.type === "addTrack")
+              if (addTrack && "track" in addTrack) track = addTrack.track.id
+            }
+            added++
+          }
+          return ops
+        })
+
+        const first = onTimeline(phrases[0].start)
+        const last = onTimeline(phrases[Math.min(added, phrases.length) - 1].end)
+        return text(
+          `Added ${added} captions from ${formatTimestamp(first)} to ${formatTimestamp(last)}, ${input.maxWords} words at most each. Check them with get_project.`
+        )
+      }
+    )
+  )
+}

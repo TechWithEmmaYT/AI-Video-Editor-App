@@ -4,6 +4,7 @@ import { compileCode } from "@/lib/code-clips/compile"
 import { instrument } from "@/lib/code-clips/instrument"
 import { changedCodeError } from "@/lib/code-clips/doc-check"
 import { validateCode } from "@/lib/code-clips/validate"
+import { CLIP_MOTION_DEFAULTS } from "@/lib/project/schema"
 
 /** Runs code against a fake context and returns what it threw (or null). */
 function run(code: string, p: Record<string, unknown> = {}) {
@@ -123,7 +124,7 @@ describe("changedCodeError", () => {
   const codeClip = (code: string) => ({
     id: "c1", trackId: "t1", type: "code" as const, name: "Clip", color: "code", from: 0, durationInFrames: 30,
     transform: { x: 0, y: 0, width: 10, height: 10, scale: 1, rotation: 0, opacity: 1 },
-    code, params: {}, paramSchema: [], fonts: [], radius: 0,
+    code, params: {}, paramSchema: [], fonts: [], radius: 0, ...CLIP_MOTION_DEFAULTS,
   })
 
   it("rejects new or edited code that fails the validator, with its line", () => {

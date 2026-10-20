@@ -3,7 +3,7 @@ import type { ElementDef, ElementLayout } from "@/lib/elements/types"
 import { chooseVisualTrack, type DropTarget } from "@/lib/project/drop"
 import { MAX_SECONDS } from "@/lib/project/formats"
 import type { Op, ProjectData } from "@/lib/project/ops"
-import type { CodeClip, Transform } from "@/lib/project/schema"
+import { CLIP_MOTION_DEFAULTS, type CodeClip, type Transform } from "@/lib/project/schema"
 
 /** The box an element gets on a w×h canvas. */
 export function elementBox(layout: ElementLayout, w: number, h: number): Transform {
@@ -52,6 +52,7 @@ export function codeClipFromElement(
   { id, trackId, from, durationInFrames, width, height }: { id: string; trackId: string; from: number; durationInFrames: number; width: number; height: number }
 ): CodeClip {
   return {
+    ...CLIP_MOTION_DEFAULTS,
     id,
     trackId,
     type: "code",

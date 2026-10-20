@@ -1,16 +1,17 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { MousePointerClickIcon } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import { cn } from "cn"
 
 import { CreateKeyButton } from "@/components/claude/create-key-button"
 import { TerminalCommand } from "@/components/claude/terminal-command"
 import { CLIP_META } from "@/components/editor/clip-meta"
 import { mcpAddCommand } from "@/lib/agent/connect"
-import { getClaudeStatusQueryFn, queryKeys } from "@/lib/api"
+import { disconnectClaudeMutationFn, getClaudeStatusQueryFn, queryKeys } from "@/lib/api"
 import { timeAgo } from "@/lib/time"
 import { useEditorStore, useSelectedClip } from "@/stores/editor-store"
 
@@ -99,7 +100,7 @@ function ClaudeStatus() {
           )}
         />
       </span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{label}</p>
         <p className="text-xs text-muted-foreground">
           {state === "never"
@@ -109,6 +110,58 @@ function ClaudeStatus() {
               : "Claude Code over MCP"}
         </p>
       </div>
+      {(state === "connected" || state === "working") && <DisconnectButton />}
+    </div>
+  )
+}
+
+/** Revokes every key and clears the status, so Claude Code's next request fails. */
+function DisconnectButton() {
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
+
+  const disconnect = useMutation({
+    mutationFn: disconnectClaudeMutationFn,
+    onSuccess: (revoked) => {
+      queryClient.setQueryData(queryKeys.claudeStatus, null)
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys })
+      setConfirming(false)
+      toast.success("Disconnected Claude Code", {
+        description: revoked === 0 ? "There were no keys to revoke." : `Revoked ${revoked} key${revoked === 1 ? "" : "s"}.`,
+      })
+    },
+    onError: (error) => toast.error("Couldn't disconnect", { description: error.message }),
+  })
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="h-8 shrink-0 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+      >
+        Disconnect
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setConfirming(false)}
+        className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        disabled={disconnect.isPending}
+        onClick={() => disconnect.mutate()}
+        className="h-8 rounded-full bg-destructive px-3 text-xs font-semibold text-white disabled:opacity-60"
+      >
+        {disconnect.isPending ? "Revoking…" : "Revoke all keys"}
+      </button>
     </div>
   )
 }

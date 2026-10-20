@@ -30,9 +30,9 @@ function fakeContext() {
 }
 
 describe("built-in elements", () => {
-  it("has the plan's 15 elements plus Kinetic Caption and Solid Colour, with unique ids", () => {
-    expect(BUILTIN_ELEMENTS).toHaveLength(17)
-    expect(new Set(BUILTIN_ELEMENTS.map((e) => e.id)).size).toBe(17)
+  it("has every built-in, with unique ids", () => {
+    expect(BUILTIN_ELEMENTS).toHaveLength(21)
+    expect(new Set(BUILTIN_ELEMENTS.map((e) => e.id)).size).toBe(21)
   })
 
   it.each(BUILTIN_ELEMENTS.map((e) => [e.name, e] as const))("%s passes the validator and draws without errors", (_, element) => {

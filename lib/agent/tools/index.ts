@@ -2,6 +2,7 @@ import "server-only"
 
 import type { McpServer } from "@modelcontextprotocol/server"
 
+import { registerCaptionTools } from "@/lib/agent/tools/captions"
 import { registerClipTools } from "@/lib/agent/tools/clips"
 import { registerElementTools } from "@/lib/agent/tools/elements"
 import { registerGuideTool } from "@/lib/agent/tools/guide"
@@ -29,6 +30,7 @@ export function registerAgentTools(server: McpServer) {
   registerProjectTools(recording)
   registerMediaTools(recording)
   registerClipTools(recording)
+  registerCaptionTools(recording)
   registerSectionTools(recording)
   registerElementTools(recording)
 }

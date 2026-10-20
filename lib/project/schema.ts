@@ -24,6 +24,14 @@ export const transformSchema = z.object({
 
 const fit = z.enum(["cover", "contain", "fill"])
 
+/**
+ * How a clip enters and leaves. The renderer folds these into the clip's own opacity and scale,
+ * so any clip type can move without being rewritten as code. Older clips have none ("none").
+ */
+export const MOTIONS = ["none", "pop", "rise", "scale", "grow", "wipe", "blur"] as const
+const motion = z.enum(MOTIONS).default("none")
+const motionFrames = z.number().int().min(0).max(120).default(8)
+
 const clipBase = {
   id,
   trackId: id,
@@ -32,6 +40,10 @@ const clipBase = {
   from: frames,
   durationInFrames: z.number().int().min(1),
   transform: transformSchema,
+  animateIn: motion,
+  animateInFrames: motionFrames,
+  animateOut: motion,
+  animateOutFrames: motionFrames,
 }
 
 export const videoClipSchema = z.object({
@@ -162,3 +174,11 @@ export type Section = z.infer<typeof sectionSchema>
 export type Doc = z.infer<typeof docSchema>
 
 export const EMPTY_DOC: Doc = { tracks: [], clips: [], sections: [] }
+
+/** The motion fields a freshly built clip starts with: none, until something sets them. */
+export const CLIP_MOTION_DEFAULTS = {
+  animateIn: "none",
+  animateInFrames: 8,
+  animateOut: "none",
+  animateOutFrames: 8,
+} as const satisfies Pick<Clip, "animateIn" | "animateInFrames" | "animateOut" | "animateOutFrames">

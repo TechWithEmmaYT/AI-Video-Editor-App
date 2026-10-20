@@ -2,7 +2,7 @@ import { readMediaDragData, type MediaDragPayload } from "@/lib/media-drag"
 import { MAX_SECONDS } from "@/lib/project/formats"
 import type { Op, ProjectData } from "@/lib/project/ops"
 import { audioZoneStart, fitBox, isAudioTrack, isRangeFree } from "@/lib/project/placement"
-import type { Clip } from "@/lib/project/schema"
+import { CLIP_MOTION_DEFAULTS, type Clip } from "@/lib/project/schema"
 
 /** Images (and media with an unknown length) get this many seconds on the timeline. */
 export const DEFAULT_STILL_SECONDS = 5
@@ -65,6 +65,7 @@ export function planMediaDrop(state: ProjectData, media: MediaDragPayload, optio
 
   const sourceDurationInFrames = media.durationSec ? Math.max(1, Math.round(media.durationSec * fps)) : null
   const base = {
+    ...CLIP_MOTION_DEFAULTS,
     id: newId(),
     trackId,
     name: media.name,

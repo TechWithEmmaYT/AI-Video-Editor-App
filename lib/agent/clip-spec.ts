@@ -7,7 +7,7 @@ import { chooseVisualTrack, mediaClipDuration } from "@/lib/project/drop"
 import { FPS, MAX_SECONDS } from "@/lib/project/formats"
 import type { Op, ProjectData } from "@/lib/project/ops"
 import { fitBox, isAudioTrack, isRangeFree } from "@/lib/project/placement"
-import type { Clip, CodeClip, Transform } from "@/lib/project/schema"
+import { CLIP_MOTION_DEFAULTS, MOTIONS, type Clip, type CodeClip, type Transform } from "@/lib/project/schema"
 import { findTextPreset, textClipFromPreset, type TextPresetId } from "@/lib/project/text-presets"
 import type { MediaDragPayload } from "@/lib/media-drag"
 
@@ -36,6 +36,13 @@ export const boxSchema = z
   .partial()
   .describe("Composition pixels; top-left is 0,0. Leave out to use the default box.")
 
+const motionFields = {
+  animateIn: z.enum(MOTIONS).optional().describe('How the clip enters: pop, rise, scale, grow, wipe or blur. Default none (a hard cut).'),
+  animateInFrames: z.number().int().min(0).max(120).optional().describe("Length of the entrance, in frames. Default 8."),
+  animateOut: z.enum(MOTIONS).optional().describe("How the clip leaves. Default none."),
+  animateOutFrames: z.number().int().min(0).max(120).optional().describe("Length of the exit, in frames. Default 8."),
+}
+
 export const addClipSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("media"),
@@ -47,6 +54,7 @@ export const addClipSchema = z.discriminatedUnion("kind", [
     fit: z.enum(["cover", "contain", "fill"]).optional(),
     radius: z.number().min(0).optional(),
     box: boxSchema.optional(),
+    ...motionFields,
     track: trackChoice,
   }),
   z.object({
@@ -61,6 +69,7 @@ export const addClipSchema = z.discriminatedUnion("kind", [
     color: z.string().max(32).optional(),
     align: z.enum(["left", "center", "right"]).optional(),
     box: boxSchema.optional(),
+    ...motionFields,
     track: trackChoice,
   }),
   z.object({
@@ -70,6 +79,7 @@ export const addClipSchema = z.discriminatedUnion("kind", [
     duration: seconds.optional().describe("Seconds. Default: the element's."),
     params: z.record(z.string(), z.unknown()).optional().describe("Overrides the element's default params."),
     box: boxSchema.optional(),
+    ...motionFields,
     track: trackChoice,
   }),
   z.object({
@@ -82,6 +92,7 @@ export const addClipSchema = z.discriminatedUnion("kind", [
     fonts: z.array(z.string().max(100)).max(10).default([]),
     radius: z.number().min(0).default(0),
     box: boxSchema.optional().describe("Default: the whole canvas."),
+    ...motionFields,
     track: trackChoice,
   }),
 ])
@@ -117,6 +128,7 @@ export function addClipOps(
       const wanted = spec.duration ? frames(spec.duration) : media.kind === "image" ? mediaClipDuration(media, FPS) : (available ?? mediaClipDuration(media, FPS))
       const durationInFrames = Math.max(1, available !== null ? Math.min(wanted, available) : wanted)
       const base = {
+        ...CLIP_MOTION_DEFAULTS,
         id,
         trackId: "",
         name: media.name,
@@ -161,6 +173,7 @@ export function addClipOps(
     }
     case "code": {
       const made: CodeClip = {
+        ...CLIP_MOTION_DEFAULTS,
         id,
         trackId: "",
         type: "code",
@@ -179,6 +192,11 @@ export function addClipOps(
       break
     }
   }
+
+  if (spec.animateIn !== undefined) clip.animateIn = spec.animateIn
+  if (spec.animateInFrames !== undefined) clip.animateInFrames = spec.animateInFrames
+  if (spec.animateOut !== undefined) clip.animateOut = spec.animateOut
+  if (spec.animateOutFrames !== undefined) clip.animateOutFrames = spec.animateOutFrames
 
   // Clamp to the project's maximum length.
   clip.durationInFrames = Math.max(1, Math.min(clip.durationInFrames, MAX_SECONDS * FPS - from))
@@ -239,6 +257,10 @@ export const updateClipSchema = z
     fadeOut: seconds.describe("Audio: fade-out seconds."),
     code: z.string().min(1).max(20_000).describe("Code clips: replaces the code (checked by the validator)."),
     fonts: z.array(z.string().max(100)).max(10),
+    animateIn: z.enum(MOTIONS),
+    animateInFrames: z.number().int().min(0).max(120),
+    animateOut: z.enum(MOTIONS),
+    animateOutFrames: z.number().int().min(0).max(120),
   })
   .partial()
 
