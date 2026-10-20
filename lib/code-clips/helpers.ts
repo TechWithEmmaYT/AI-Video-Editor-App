@@ -123,8 +123,9 @@ const roundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath()
 }
 
-/** A CSS font string: ctx.font = M.font("Inter", 700, 64). */
-const font = (family: string, weight = 400, size = 32) => `${weight} ${size}px ${fontStack(family)}`
+/** A CSS font string: ctx.font = M.font("Inter", 700, 64), or M.font("Playfair Display", 700, 64, "italic"). */
+const font = (family: string, weight = 400, size = 32, style = "normal") =>
+  `${style === "italic" ? "italic " : ""}${weight} ${size}px ${fontStack(family)}`
 
 /** Shrinks ctx.font (from `size` down) until `text` fits in maxW. Sets it and returns the size used. */
 const fitText = (ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number) => {

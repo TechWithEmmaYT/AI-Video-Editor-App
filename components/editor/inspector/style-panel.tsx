@@ -171,6 +171,17 @@ function VideoStyle({ clip }: { clip: VideoClip }) {
           onCommit={(s) => edit.commit(startsAt(s))}
         />
         <VolumeRow clip={clip} />
+        <NumberRow
+          label="Corner radius"
+          // Clips saved before videos had a radius have none.
+          value={clip.radius ?? 0}
+          min={0}
+          max={Math.round(Math.min(clip.transform.width, clip.transform.height) / 2)}
+          unit="px"
+          fill
+          onPreview={(radius) => edit.preview({ radius })}
+          onCommit={(radius) => edit.commit({ radius })}
+        />
       </InspectorSection>
     </div>
   )

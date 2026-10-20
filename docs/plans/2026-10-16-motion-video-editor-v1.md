@@ -404,7 +404,30 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
 
 - **Done:** auth, home/new-project, project doc schema + ops reducer (`lib/project/schema.ts`, `ops.ts`), `POST /api/projects/[id]/ops` (version-checked save), editor store (`stores/editor-store.ts`), editor shell, canvas (Player, zoom/fit), timeline (ruler/scrub, playhead, sections, tracks, move/trim/split, snapping with Shift to bypass, undo/redo, shortcuts, resizable height), media drop.
 - **Media tab:** UI only (react-dropzone zone + empty state). ImageKit upload, `/api/imagekit/auth`, `/api/projects/[id]/media` and the media cards are built by hand, outside this plan's automation. `media` table migration `0002_media.sql` is generated, not yet applied.
-- **Not yet:** live updates (SSE), MCP tools + `editor_state`, Settings key list/revoke, export.
+- **Not yet:** live updates (SSE), MCP tools + `editor_state`, Settings account card, export.
+- **2026-10-24 (later):**
+  - **Shortcuts:** they run in the capture phase; sliders only claim arrow/Home/End keys, so Delete/Backspace always reach the selected clip.
+  - **Clip menu:** right-click a clip for Split at playhead / Duplicate / Delete (`clip-context-menu.tsx`).
+  - **Still to do:** long-form brief (shared caption/b-roll rules defined once), Clear timeline button, playhead knob kept in the sticky ruler when scrolling, `<||>` cursor on the playhead body.
+- **2026-10-24 — reel style (briefs):**
+  - **Video radius:** video clips have `radius` (default 0; Style → Corner radius), for b-roll in a rounded card.
+  - **Italic fonts:** `FontDef.italics`, `loadFont(family, weight, style)`, and `M.font(family, weight, size, "italic")`. 10 curated fonts have italics, including Playfair Display.
+  - **New built-ins:** **Kinetic Caption** (`lib/elements/builtin/captions.ts`: one 1–4 word phrase word by word; `*word*` = emphasis; `times` = per-word starts from the transcript; new `caption` layout in the top third) and **Solid Colour** (black backdrop behind b-roll cards).
+  - **Briefs:** `lib/agent/briefs/`, one editing style per file, starting with `reel-captions.ts` ("Reel captions + b-roll"); a test checks it only names real elements and fonts. `get_guide` will serve them; `get_project`, `get_media`, `add_media_from_url`, `add_clip` and `update_clip` are still to build.
+- **2026-10-23 — transcripts (so Claude knows what's said):**
+  - **Storage:** `media.transcript` jsonb (migration `0006_media_transcript.sql`), one shape for every source (`lib/transcript.ts`, tested).
+  - **Sources:** ImageKit AI (`{url}/ik-gensubtitle.transcript` word-level JSON + `{url}/ik-genchapter.vtt` chapters; 2 extension units/min, generated once on request and saved), or the user's own .srt/.vtt/pasted text.
+  - **Route + UI:** `POST/DELETE /api/projects/[id]/media/[mediaId]/transcript` (202 while ImageKit is processing). The media card's ⋯ menu has Generate / Upload / Paste / Remove, and a CC badge.
+  - **MCP:** the first tool, `get_media_transcript(mediaId, from?, to?)`, in `lib/agent/tools/media.ts`, registered via `lib/agent/tools/index.ts`.
+- **2026-10-23 — contact sheets (so Claude can see uploaded videos):**
+  - **Generation:** `lib/contact-sheet.ts` draws 12 timestamped frames from the local file during upload (4×3 for landscape, 6×2 for vertical; JPEG, ~50 KB).
+  - **Storage:** uploaded to ImageKit as an image in the same project folder, saved as `media.contactSheetUrl` (migration `0005_media_contact_sheet.sql`). No ImageKit video thumbnails, so no video units.
+  - **Fallback:** null if the browser can't decode the file.
+  - **Next:** `get_project` describes each video clip's source range, and `get_media_contact_sheet(mediaId)` returns the sheet image to Claude. A rendered-frame tool comes with export.
+- **2026-10-22 (later):**
+  - **Settings:** API keys card (create via the shared dialog, list with key start / created / last used / expires, revoke).
+  - **MCP files:** everything MCP lives in `lib/agent/` (`connect.ts`, `status.ts`, `auth.ts`).
+  - **Ratio:** the editor header has a ratio dropdown (16:9 / 9:16 / 1:1). `updateProject` takes `format`, and `ProjectData` carries it. `changeFormatOps` refits clips, so the change is one undoable step and the server saves format + width + height.
 - **2026-10-22 — Claude tab + MCP connection (no tools yet):**
   - **Claude tab:** status dot (Not connected / Connected · seen … / Working… within 10 s), Create key dialog (name, 7 days / 30 days / Never; key shown once with the filled-in command), and "this" (project + selected clip).
   - **MCP route:** `/api/mcp` (`mcp-handler` 2 + `withMcpAuth`, API key as bearer) accepts connections and records `claude_status.lastSeenAt`. It registers no tools yet.

@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { createMediaMutationFn, getImagekitAuthQueryFn, queryKeys } from "@/lib/api"
+import { makeContactSheet } from "@/lib/contact-sheet"
 import { videoThumbnailUrl } from "@/lib/media-url"
 import { useMediaUploadStore, type PendingUpload } from "@/stores/media-upload-store"
 import type { Media, MediaKind } from "@/types/project"
@@ -65,6 +66,8 @@ export function useMediaUpload(projectId: string) {
     const id = crypto.randomUUID()
     const previewUrl = URL.createObjectURL(file)
     const controller = start({ id, projectId, name: file.name, kind, previewUrl, progress: 0 })
+    // Videos: build the contact sheet (frames for Claude) from the local file while the video uploads.
+    const sheet = kind === "video" ? makeContactSheet(previewUrl) : Promise.resolve(null)
 
     try {
       // Fresh credentials for every upload (each token works once); read the file's size and length meanwhile.
@@ -83,6 +86,7 @@ export function useMediaUpload(projectId: string) {
         onProgress: (event) => setProgress(id, event.total ? Math.round((event.loaded / event.total) * 100) : 0),
       })
       if (!result.fileId || !result.filePath || !result.url) throw new Error("ImageKit didn't return the uploaded file.")
+      const contactSheetUrl = await uploadContactSheet(await sheet, file.name, projectId, controller.signal)
 
       const media = await createMediaMutationFn({
         projectId,
@@ -97,6 +101,7 @@ export function useMediaUpload(projectId: string) {
         width: positiveOrNull(result.width ?? local.width),
         height: positiveOrNull(result.height ?? local.height),
         durationSec: positiveOrNull(result.duration ?? local.durationSec),
+        contactSheetUrl,
       })
       queryClient.setQueryData<Media[]>(queryKeys.media(projectId), (list) => [media, ...(list ?? [])])
       return media
@@ -117,6 +122,33 @@ export function useMediaUpload(projectId: string) {
 
   return { pending, uploadFile, cancel }
 } 
+
+/**
+ * Uploads a video's contact sheet next to it (same project folder) as a plain image. Null when there
+ * isn't one or it fails: the video upload still succeeds without it. Cancelling still cancels.
+ */
+async function uploadContactSheet(blob: Blob | null, videoName: string, projectId: string, signal: AbortSignal) {
+  if (!blob) return null
+  try {
+    // Fresh credentials: each token works for one upload.
+    const auth = await getImagekitAuthQueryFn()
+    const name = `${videoName.replace(/\.[^.]+$/, "")}-contact-sheet.jpg`
+    const result = await upload({
+      file: new File([blob], name, { type: "image/jpeg" }),
+      fileName: name,
+      token: auth.token,
+      expire: auth.expire,
+      signature: auth.signature,
+      publicKey: auth.publicKey,
+      folder: `${auth.folder}${projectId}/`,
+      abortSignal: signal,
+    })
+    return result.url ?? null
+  } catch (error) {
+    if (error instanceof ImageKitAbortError) throw error
+    return null
+  }
+}
 
 /** Images use ImageKit's thumbnail; videos get a poster frame from ImageKit; audio has none. */ 
 function thumbnailFor(kind: MediaKind, result: UploadResponse) {

@@ -45,6 +45,8 @@ export const videoClipSchema = z.object({
   sourceDurationInFrames: z.number().int().positive().nullable(),
   volume: z.number().min(0).max(2),
   fit,
+  /** Rounded corners, so b-roll can sit in a card on black. Older clips have none (0). */
+  radius: z.number().min(0).default(0),
 })
 
 export const imageClipSchema = z.object({

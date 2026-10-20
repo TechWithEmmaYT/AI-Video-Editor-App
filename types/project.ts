@@ -46,5 +46,9 @@ export type Media = {
   width: number | null
   height: number | null
   durationSec: number | null
+  /** Videos: a grid of ~12 timestamped frames (one image on ImageKit), for Claude. Null when there isn't one. */
+  contactSheetUrl: string | null
+  /** Where its transcript came from, or null if it has none (the text itself is loaded only when needed). */
+  transcriptSource: "imagekit" | "user" | null
   createdAt: string
 }

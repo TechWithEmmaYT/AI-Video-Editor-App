@@ -35,3 +35,8 @@ export type ApiKeySummary = {
   lastUsedAt: string | null
   expiresAt: string | null
 }
+
+/** Adding/removing a transcript. "processing": ImageKit is still transcribing, ask again shortly. */
+export type TranscriptResponse =
+  | { status: "ready"; transcriptSource: "imagekit" | "user" | null }
+  | { status: "processing" }

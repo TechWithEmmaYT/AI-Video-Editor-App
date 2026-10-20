@@ -12,9 +12,9 @@ export const ELEMENT_CATEGORIES = [
 export type ElementCategory = (typeof ELEMENT_CATEGORIES)[number]["id"]
 
 /** Where an element's box sits on the canvas when it's added (see lib/elements/place.ts). */
-export type ElementLayout = "full" | "title" | "lower-third" | "square" | "callout"
+export type ElementLayout = "full" | "title" | "caption" | "lower-third" | "square" | "callout"
 
-export const ELEMENT_LAYOUTS: ElementLayout[] = ["full", "title", "lower-third", "square", "callout"]
+export const ELEMENT_LAYOUTS: ElementLayout[] = ["full", "title", "caption", "lower-third", "square", "callout"]
 
 /** A reusable code clip: a built-in, or one the user or Claude saved ("Mine"). */
 export type ElementDef = {

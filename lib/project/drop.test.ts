@@ -38,6 +38,8 @@ function media(overrides: Partial<Media> = {}): Media {
     width: 1920,
     height: 1080,
     durationSec: 4,
+    contactSheetUrl: null,
+    transcriptSource: null,
     createdAt: "2026-10-17T00:00:00.000Z",
     ...overrides,
   }

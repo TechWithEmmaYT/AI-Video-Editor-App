@@ -25,6 +25,8 @@ export const auth = betterAuth({
     // Keys are what Claude Code sends over MCP.
     apiKey({
       defaultPrefix: "motion_",
+      // Keep a few characters past the prefix, so keys can be told apart in Settings ("motion_AbCd…").
+      startingCharactersConfig: { shouldStore: true, charactersLength: 11 },
       // No default: the UI always sends one (7 days by default, 30 days, or none for "Never").
       // A default would also override "Never" (the plugin treats a null expiresIn as "use the default"),
       // and despite its docs it reads defaultExpiresIn as seconds, not milliseconds.

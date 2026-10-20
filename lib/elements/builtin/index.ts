@@ -1,6 +1,7 @@
 import { circleReveal, wipe } from "@/lib/elements/builtin/transitions"
 import { arrowPointer, badgePop, highlightBox } from "@/lib/elements/builtin/callouts"
-import { dotGrid, gradientMesh, noiseWaves } from "@/lib/elements/builtin/backgrounds"
+import { kineticCaption } from "@/lib/elements/builtin/captions"
+import { dotGrid, gradientMesh, noiseWaves, solidColour } from "@/lib/elements/builtin/backgrounds"
 import { logoSpin, svgLogoReveal } from "@/lib/elements/builtin/logos"
 import { barLowerThird, pillNameTag } from "@/lib/elements/builtin/lower-thirds"
 import { bigTitle, kineticWords, typewriter } from "@/lib/elements/builtin/titles"
@@ -10,6 +11,7 @@ import type { ElementDef } from "@/lib/elements/types"
 export const BUILTIN_ELEMENTS: ElementDef[] = [
   bigTitle,
   kineticWords,
+  kineticCaption,
   typewriter,
   barLowerThird,
   pillNameTag,
@@ -18,6 +20,7 @@ export const BUILTIN_ELEMENTS: ElementDef[] = [
   gradientMesh,
   dotGrid,
   noiseWaves,
+  solidColour,
   wipe,
   circleReveal,
   arrowPointer,

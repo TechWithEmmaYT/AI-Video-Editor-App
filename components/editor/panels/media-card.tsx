@@ -3,6 +3,7 @@
 import { ImageIcon, MusicIcon, VideoIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 
+import { TranscriptBadge, TranscriptMenu } from "@/components/editor/panels/transcript-menu"
 import type { PendingUpload } from "@/components/editor/panels/use-media-upload"
 import {
   CircularProgress,
@@ -55,6 +56,12 @@ export function MediaCard({ media }: { media: Media }) {
           <Icon className="size-3" />
           {media.durationSec ? formatDuration(media.durationSec) : media.kind === "image" ? "Image" : null}
         </span>
+        {media.kind !== "image" && (
+          <>
+            <TranscriptBadge media={media} />
+            <TranscriptMenu media={media} />
+          </>
+        )}
       </div>
       <p className="truncate text-[13px] font-medium">{media.name}</p>
     </div>

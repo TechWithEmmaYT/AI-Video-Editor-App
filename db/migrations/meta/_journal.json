@@ -36,6 +36,20 @@
       "when": 1792489746319,
       "tag": "0004_claude_status",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792492555230,
+      "tag": "0005_media_contact_sheet",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792494247924,
+      "tag": "0006_media_transcript",
+      "breakpoints": true
     }
   ]
 }

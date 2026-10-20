@@ -57,7 +57,7 @@ function ClipView({ clip, preview }: { clip: Clip; preview: boolean }) {
   switch (clip.type) {
     case "video":
       return (
-        <Layer clip={clip}>
+        <Layer clip={clip} radius={clip.radius}>
           <Video
             // The original file, untouched: no ImageKit video processing, in the editor or the export.
             src={originalMediaUrl(clip.src)}

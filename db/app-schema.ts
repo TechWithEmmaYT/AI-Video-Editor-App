@@ -2,6 +2,7 @@ import { bigint, doublePrecision, index, integer, jsonb, pgTable, text, timestam
 
 import type { ElementCategory, ElementLayout } from "@/lib/elements/types"
 import type { ParamDef } from "@/lib/project/schema"
+import type { Transcript } from "@/lib/transcript"
 import type { MediaKind, ProjectDoc, ProjectFormat } from "@/types/project"
 
 import { user } from "./auth-schema"
@@ -59,6 +60,10 @@ export const media = pgTable(
     width: integer("width"),
     height: integer("height"),
     durationSec: doublePrecision("duration_sec"),
+    /** Videos: ~12 frames with timestamps in one image (made in the browser on upload), so Claude can see what's in it. */
+    contactSheetUrl: text("contact_sheet_url"),
+    /** What's said in it (ImageKit AI transcription, or the user's .srt/.vtt/pasted text), for Claude. */
+    transcript: jsonb("transcript").$type<Transcript>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("media_projectId_createdAt_idx").on(table.projectId, table.createdAt)]

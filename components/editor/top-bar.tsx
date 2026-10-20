@@ -138,7 +138,8 @@ function FormatMenu() {
             {FORMAT_ORDER.map((id) => {
               const info = FORMATS[id]
               return (
-                <DropdownMenuRadioItem key={id} value={id} className="gap-3 rounded-lg py-2 pl-2">
+                // Radio items stay open on click by default; picking a ratio should close the menu.
+                <DropdownMenuRadioItem key={id} value={id} closeOnClick className="gap-3 rounded-lg py-2 pl-2">
                   <RatioIcon format={id} />
                   <span className="flex min-w-0 flex-col">
                     <span className="text-[13px] font-semibold">

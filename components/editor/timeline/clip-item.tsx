@@ -4,6 +4,7 @@ import { useRef, useState } from "react"
 import { cn } from "cn"
 
 import { CLIP_META } from "@/components/editor/clip-meta"
+import { ClipContextMenu } from "@/components/editor/timeline/clip-context-menu"
 import { laneAt, laneOffset, useTimeline } from "@/components/editor/timeline/timeline-context"
 import { videoThumbnailUrl } from "@/lib/media-url"
 import { clipEnd, splitClipOps } from "@/lib/project/edit"
@@ -128,7 +129,7 @@ export function ClipItem({ clip, pxPerFrame }: { clip: Clip; pxPerFrame: number 
   const width = shown.duration * pxPerFrame
   const handles = tool === "select" && width > 28
 
-  return (
+  const block = (
     <div
       data-clip-id={clip.id}
       onPointerDown={(event) => begin("move", event)}
@@ -170,6 +171,7 @@ export function ClipItem({ clip, pxPerFrame }: { clip: Clip; pxPerFrame: number 
       {handles && <TrimHandle side="end" onPointerDown={(event) => begin("trim-end", event)} />}
     </div>
   )
+  return <ClipContextMenu clip={clip} trigger={block} />
 }
 
 function TrimHandle({ side, onPointerDown }: { side: "start" | "end"; onPointerDown: (event: React.PointerEvent) => void }) {

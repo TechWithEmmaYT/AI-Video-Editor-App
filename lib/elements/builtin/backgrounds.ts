@@ -95,3 +95,18 @@ for (let i = 0; i < lines; i++) {
   ctx.stroke()
 }`,
 }
+
+/** A plain colour over the whole canvas: e.g. black behind a b-roll card while the speaker's audio keeps playing. */
+export const solidColour: ElementDef = {
+  id: "solid-colour",
+  name: "Solid Colour",
+  category: "backgrounds",
+  layout: "full",
+  defaultDurationInFrames: 90,
+  fonts: [],
+  paramSchema: [{ key: "color", label: "Colour", type: "color", default: "#000000" }],
+  defaultParams: {},
+  createdBy: "builtin",
+  code: `ctx.fillStyle = p.color
+ctx.fillRect(0, 0, w, h)`,
+}

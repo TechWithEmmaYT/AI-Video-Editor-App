@@ -3,6 +3,7 @@ import axios, { isAxiosError } from "axios"
 import { authClient } from "@/lib/auth-client"
 import type { Op } from "@/lib/project/ops"
 import type { SaveElementInput } from "@/lib/elements/validation"
+import type { Transcript } from "@/lib/transcript"
 import type { CreateMediaInput } from "@/lib/project/validation"
 import type {
   ApiError,
@@ -17,6 +18,7 @@ import type {
   MediaResponse,
   ProjectResponse,
   ProjectsResponse,
+  TranscriptResponse,
 } from "@/types/api"
 import type { CreateProjectInput } from "@/types/project"
 
@@ -94,6 +96,23 @@ export async function getMediaQueryFn(projectId: string) {
 export async function createMediaMutationFn({ projectId, ...input }: CreateMediaInput & { projectId: string }) {
   const { data } = await api.post<MediaResponse>(`/projects/${projectId}/media`, input satisfies CreateMediaInput)
   return data.media
+}
+
+/** Transcribes a video with ImageKit. "processing" means ImageKit is still working: call again in a few seconds. */
+export async function generateTranscriptMutationFn({ projectId, mediaId }: { projectId: string; mediaId: string }) {
+  const { data } = await api.post<TranscriptResponse>(`/projects/${projectId}/media/${mediaId}/transcript`, { source: "imagekit" })
+  return data
+}
+
+/** Saves the user's own transcript (parsed from an .srt/.vtt file or pasted text). */
+export async function saveTranscriptMutationFn({ projectId, mediaId, transcript }: { projectId: string; mediaId: string; transcript: Transcript }) {
+  const { data } = await api.post<TranscriptResponse>(`/projects/${projectId}/media/${mediaId}/transcript`, { source: "user", transcript })
+  return data
+}
+
+export async function removeTranscriptMutationFn({ projectId, mediaId }: { projectId: string; mediaId: string }) {
+  const { data } = await api.delete<TranscriptResponse>(`/projects/${projectId}/media/${mediaId}/transcript`)
+  return data
 }
 
 // ── Elements ("Mine") ───────────────────────────────────────────────────

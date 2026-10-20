@@ -5,10 +5,18 @@ import { useEffect } from "react"
 import { splitClipOps } from "@/lib/project/edit"
 import { useEditorStore } from "@/stores/editor-store"
 
+/** Keys a focused field (or open menu/dialog) needs for itself. */
 function isTyping(target: EventTarget | null) {
   const element = target as HTMLElement | null
-  return !!element?.closest("input, textarea, select, [contenteditable=true], [role=slider]")
+  return !!element?.closest(
+    "input:not([type=range]), textarea, select, [contenteditable=true], [role=menu], [role=dialog], [role=listbox]"
+  )
 }
+
+/** Sliders (zoom, the playhead knob) keep focus after use; they only need the keys that move them. */
+const SLIDER_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown", "home", "end", "pageup", "pagedown"])
+const onSlider = (target: EventTarget | null) =>
+  !!(target as HTMLElement | null)?.closest("[role=slider], input[type=range]")
 
 /**
  * Space play/pause · ←/→ step a frame (⇧ a second) · ⌫ delete · S split at playhead ·
@@ -21,6 +29,7 @@ export function useEditorShortcuts() {
       const store = useEditorStore.getState()
       const mod = event.metaKey || event.ctrlKey
       const key = event.key.toLowerCase()
+      if (onSlider(event.target) && SLIDER_KEYS.has(key)) return
 
       if (mod && key === "z") {
         event.preventDefault()
@@ -72,7 +81,8 @@ export function useEditorShortcuts() {
           return
       }
     }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
+    // Capture phase: runs before anything on the page can stop the key (e.g. a focused widget).
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
   }, [])
 }

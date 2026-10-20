@@ -22,6 +22,8 @@ function toMedia(row: Row): Media {
     width: row.width,
     height: row.height,
     durationSec: row.durationSec,
+    contactSheetUrl: row.contactSheetUrl,
+    transcriptSource: row.transcript?.source ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }

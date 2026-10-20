@@ -78,7 +78,7 @@ export function planMediaDrop(state: ProjectData, media: MediaDragPayload, optio
 
   const clip: Clip =
     media.kind === "video"
-      ? { ...base, type: "video", trimStartFrames: 0, sourceDurationInFrames, volume: 1, fit: "cover" }
+      ? { ...base, type: "video", trimStartFrames: 0, sourceDurationInFrames, volume: 1, fit: "cover", radius: 0 }
       : media.kind === "image"
         ? { ...base, type: "image", fit: "cover", radius: 0 }
         : {

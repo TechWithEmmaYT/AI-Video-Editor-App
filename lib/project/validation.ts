@@ -32,6 +32,11 @@ export const createMediaSchema = z.object({
   width: z.number().positive().nullable(),
   height: z.number().positive().nullable(),
   durationSec: z.number().positive().nullable(),
+  contactSheetUrl: z
+    .url()
+    .refine((url) => url.startsWith(envConfig.imagekit.urlEndpoint), "The contact sheet must be hosted on ImageKit.")
+    .nullable()
+    .default(null),
 })
 
 export type CreateMediaInput = z.infer<typeof createMediaSchema>

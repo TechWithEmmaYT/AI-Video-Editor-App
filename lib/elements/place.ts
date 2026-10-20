@@ -21,6 +21,11 @@ export function elementBox(layout: ElementLayout, w: number, h: number): Transfo
       return box(w, h, 0, 0)
     case "title":
       return box(w * 0.84, h * 0.36)
+    case "caption": {
+      // Top third, clear of the app UI at the very top of vertical video (18% down in 9:16).
+      const height = short * 0.2
+      return box(w * 0.88, height, w * 0.06, h > w ? h * 0.18 : h * 0.1)
+    }
     case "lower-third": {
       const width = w > h ? w * 0.5 : w * 0.86
       const height = short * 0.15
