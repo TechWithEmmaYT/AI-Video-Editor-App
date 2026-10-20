@@ -10,7 +10,9 @@ import type { CodeClip } from "@/lib/project/schema"
 
 /*
  * A code clip: a canvas the size of the clip box as it appears on screen (box × the Player's zoom ×
- * devicePixelRatio in the editor; exactly the box, ×1, in the export), redrawn every frame by the clip's checked, compiled code. Position, opacity and radius
+ * devicePixelRatio in the editor; exactly the box, ×1, in the export), redrawn every frame by the
+ * clip's checked, compiled code. While premounted (Sequence premountFor) Remotion freezes its frame,
+ * so it draws once and waits until it's on screen. Position, opacity and radius
  * come from the Layer around it; the code only draws. Errors draw a red box on the clip and are
  * reported to the Style tab; the rest of the video keeps playing.
  */
@@ -31,17 +33,19 @@ export function CodeClipView({ clip }: { clip: CodeClip }) {
   const [assetsVersion, setAssetsVersion] = useState(0)
   // Export frames held until those loads land (released after the redraw that uses them).
   const held = useRef<number[]>([])
+  // The helpers (M), made once per clip on its first draw. They report images/SVGs still loading
+  // into `pending`, which is emptied before each draw.
+  const helpersRef = useRef<{ M: ReturnType<typeof createHelpers>; pending: Promise<unknown>[] } | null>(null)
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     // Pixels per composition pixel: sharp at the size it's shown, without a full-size canvas per clip.
     const dpr = rendering ? 1 : Math.min(2, Math.max(0.1, playerScale * (window.devicePixelRatio || 1)))
-    // Setting the size also resets the context, so nothing leaks between frames.
-    canvas.width = Math.max(1, Math.round(w * dpr))
-    canvas.height = Math.max(1, Math.round(h * dpr))
     const ctx = canvas.getContext("2d")
     if (!ctx) return
+    // Every frame starts from a blank canvas in its default state, so nothing leaks between frames.
+    freshCanvas(canvas, ctx, Math.max(1, Math.round(w * dpr)), Math.max(1, Math.round(h * dpr)), rendering)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     if (!compiled.ok) {
@@ -51,14 +55,18 @@ export function CodeClipView({ clip }: { clip: CodeClip }) {
       return
     }
 
-    const pending: Promise<unknown>[] = []
-    const M = createHelpers((promise) => pending.push(promise))
+    if (!helpersRef.current) {
+      const pending: Promise<unknown>[] = []
+      helpersRef.current = { M: createHelpers((promise) => pending.push(promise)), pending }
+    }
+    const { M, pending } = helpersRef.current
+    pending.length = 0
     const u = clip.durationInFrames > 1 ? Math.min(1, frame / (clip.durationInFrames - 1)) : 1
     try {
       compiled.draw({ ctx, t: frame / fps, u, w, h, p: params, M })
       reportCodeError(clip.id, null)
     } catch (error) {
-      canvas.width = canvas.width // reset whatever the code left behind
+      freshCanvas(canvas, ctx, canvas.width, canvas.height, rendering) // drop whatever the code left behind
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       const message = error instanceof Error ? error.message : String(error)
       drawError(ctx, w, h, message)
@@ -67,7 +75,7 @@ export function CodeClipView({ clip }: { clip: CodeClip }) {
 
     if (pending.length > 0) {
       if (rendering) held.current.push(delayRender("Loading an image for a code clip"))
-      Promise.allSettled(pending).then(() => setAssetsVersion((v) => v + 1))
+      Promise.allSettled([...pending]).then(() => setAssetsVersion((v) => v + 1))
     } else if (held.current.length > 0) {
       held.current.forEach((handle) => continueRender(handle))
       held.current = []
@@ -75,6 +83,23 @@ export function CodeClipView({ clip }: { clip: CodeClip }) {
   }, [compiled, params, frame, fps, w, h, rendering, playerScale, clip.id, clip.durationInFrames, fontsVersion, assetsVersion])
 
   return <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+}
+
+/**
+ * Gives the code a blank canvas in its default state (no transform, styles, clip or saved states),
+ * so nothing leaks from one frame to the next. Resizing the canvas does that, but it also
+ * reallocates the pixels, so in the editor it only happens when the size changes (zoom, the box,
+ * the screen); otherwise ctx.reset() clears and resets without reallocating. clearRect +
+ * setTransform alone would keep the last frame's fillStyle, globalAlpha, filters, etc. The export
+ * resizes every frame as before, so its output is unchanged.
+ */
+function freshCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, width: number, height: number, rendering: boolean) {
+  if (rendering || canvas.width !== width || canvas.height !== height || typeof ctx.reset !== "function") {
+    canvas.width = width
+    canvas.height = height
+    return
+  }
+  ctx.reset()
 }
 
 /** Loads the fonts the code declares; returns a counter that changes when they're ready (to redraw). */

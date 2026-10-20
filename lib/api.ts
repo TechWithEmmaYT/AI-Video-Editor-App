@@ -141,6 +141,12 @@ export async function startExportMutationFn(projectId: string) {
   return data.export
 }
 
+/** Cancels a running export (stops its render). */
+export async function cancelExportMutationFn({ projectId, exportId }: { projectId: string; exportId: string }) {
+  const { data } = await api.delete<ExportResponse>(`/projects/${projectId}/exports/${exportId}`)
+  return data.export
+}
+
 /** Public: whether a shared export's HLS streams are ready (the first call starts preparing them). */
 export async function getStreamStatusQueryFn(exportId: string) {
   const { data } = await api.get<StreamStatus>(`/share/${exportId}/stream`)

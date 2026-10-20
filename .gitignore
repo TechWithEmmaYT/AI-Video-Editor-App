@@ -46,3 +46,6 @@ next-env.d.ts
 
 # remotion export bundle (npm run remotion:bundle)
 .remotion-bundle
+
+.vercel
+.env*

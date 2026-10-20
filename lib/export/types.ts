@@ -3,7 +3,7 @@
  * No server-only imports: the Trigger.dev task bundles this too.
  */
 
-export type ExportStatus = "queued" | "rendering" | "uploading" | "done" | "failed"
+export type ExportStatus = "queued" | "rendering" | "uploading" | "done" | "failed" | "cancelled"
 
 /** An export as the editor sees it. */
 export type VideoExport = {
@@ -57,4 +57,4 @@ export type RenderVideoMetadata = { step?: "rendering" | "uploading"; progress?:
 /** The task's output when it succeeds. */
 export type RenderVideoOutput = { mp4Url: string; imagekitFileId: string }
 
-export const isFinished = (status: ExportStatus) => status === "done" || status === "failed"
+export const isFinished = (status: ExportStatus) => status === "done" || status === "failed" || status === "cancelled"

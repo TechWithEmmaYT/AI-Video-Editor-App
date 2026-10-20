@@ -27,6 +27,13 @@ import { clipAt, groupVideoRuns } from "@/lib/project/video-runs"
  * @remotion/media, <CanvasImage> for stills, CSS translate/scale/rotate for transforms.
  */
 
+/**
+ * Audio clips start preparing this many seconds early. Each one decodes its file in JavaScript
+ * (@remotion/media); with a busy timeline, 1 s wasn't enough for short sound effects and the
+ * Player kept pausing to wait for them. Premounting doesn't change what's heard or exported.
+ */
+const AUDIO_PREMOUNT_SECONDS = 3
+
 export type MainProps = {
   doc: Doc
   /** The editor sets this: a file that won't play only warns. Export leaves it off, so a broken file fails the render. */
@@ -50,7 +57,7 @@ export function Main({ doc, preview = false }: MainProps) {
         if (item.type === "clip") {
           const { clip } = item
           return (
-            <Sequence key={clip.id} name={clip.name} from={clip.from} durationInFrames={clip.durationInFrames} premountFor={fps}>
+            <Sequence key={clip.id} name={clip.name} from={clip.from} durationInFrames={clip.durationInFrames} premountFor={clip.type === "audio" ? fps * AUDIO_PREMOUNT_SECONDS : fps}>
               <ClipView clip={clip} preview={preview} />
             </Sequence>
           )

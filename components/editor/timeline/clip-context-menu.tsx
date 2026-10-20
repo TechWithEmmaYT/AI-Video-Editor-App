@@ -13,11 +13,12 @@ const ITEM =
 
 /** Right-click on a clip: split at the playhead, duplicate, delete. Opening it selects the clip. */
 export function ClipContextMenu({ clip, trigger }: { clip: Clip; trigger: React.ReactElement }) {
-  const frame = useEditorStore((state) => state.frame)
-  const canSplit = frame > clip.from && frame < clip.from + clip.durationInFrames
+  // A yes/no, not the frame itself: subscribing to the frame re-rendered every clip's menu on every
+  // frame of playback, which was the editor's biggest playback cost.
+  const canSplit = useEditorStore((state) => state.frame > clip.from && state.frame < clip.from + clip.durationInFrames)
 
   function run(action: "split" | "duplicate" | "delete") {
-    const { data, dispatch } = useEditorStore.getState()
+    const { data, dispatch, frame } = useEditorStore.getState()
     if (action === "delete") return dispatch([{ type: "removeClip", clipId: clip.id }])
     if (action === "split") {
       const result = splitClipOps(data, clip.id, frame, () => crypto.randomUUID())

@@ -21,8 +21,8 @@ import type { renderVideo } from "@/trigger/render-video"
 /** How many past exports the editor lists. */
 const HISTORY = 10
 const ACTIVE: ExportStatus[] = ["queued", "rendering", "uploading"]
-/** Run statuses that mean it ended without a video. */
-const FAILED_RUN = new Set(["FAILED", "CRASHED", "SYSTEM_FAILURE", "CANCELED", "EXPIRED", "TIMED_OUT"])
+/** Run statuses that mean it ended without a video (CANCELED is handled on its own: not an error). */
+const FAILED_RUN = new Set(["FAILED", "CRASHED", "SYSTEM_FAILURE", "EXPIRED", "TIMED_OUT"])
 
 type Row = typeof videoExport.$inferSelect
 
@@ -63,6 +63,8 @@ async function syncFromRun(row: Row): Promise<Row> {
   if (run.status === "COMPLETED" && run.output) {
     const output = run.output as RenderVideoOutput
     patch = { status: "done", progress: 1, mp4Url: output.mp4Url, imagekitFileId: output.imagekitFileId, finishedAt: new Date() }
+  } else if (run.status === "CANCELED") {
+    patch = { status: "cancelled", finishedAt: new Date() }
   } else if (FAILED_RUN.has(run.status) || (run.status === "COMPLETED" && !run.output)) {
     // The technical error stays in the server log (and the Trigger.dev dashboard); people see a plain message.
     console.error(`Export ${row.id} failed (${run.status})`, run.error?.message)
@@ -83,7 +85,6 @@ async function syncFromRun(row: Row): Promise<Row> {
 function friendlyError(status: string, message = "") {
   if (status === "TIMED_OUT") return "Your video took too long to export. Try again, or make it shorter."
   if (status === "EXPIRED") return "The export couldn't start. Please try again in a moment."
-  if (status === "CANCELED") return "The export was cancelled."
   if (/timeout|timed out/i.test(message)) return "A video, image or font took too long to load. Check your media and try again."
   if (/imagekit|upload/i.test(message)) return "Your video rendered but couldn't be saved. Please try again."
   return "Something went wrong while exporting. Please try again."
@@ -155,6 +156,43 @@ export async function startExport(userId: string, projectId: string): Promise<St
   const value = await toVideoExport(saved)
   await publish(projectChannel(projectId), { type: "export", export: value })
   return { status: "started", export: value }
+}
+
+export type CancelExportResult = { status: "cancelled"; export: VideoExport } | { status: "finished" } | { status: "not-found" }
+
+/**
+ * Stops a running export: cancels its Trigger.dev run (the render stops; nothing is uploaded or
+ * charged after that) and marks it cancelled.
+ */
+export async function cancelExport(userId: string, projectId: string, exportId: string): Promise<CancelExportResult> {
+  const [row] = await db
+    .select()
+    .from(videoExport)
+    .where(and(eq(videoExport.id, exportId), eq(videoExport.projectId, projectId), eq(videoExport.userId, userId)))
+    .limit(1)
+  if (!row) return { status: "not-found" }
+  if (!ACTIVE.includes(row.status)) return { status: "finished" }
+
+  if (row.triggerRunId) {
+    try {
+      await runs.cancel(row.triggerRunId)
+    } catch (error) {
+      // Already finished (or Trigger.dev unreachable): what the run reached is saved below if it ended.
+      console.error("Couldn't cancel the render's run", error)
+      const now = await syncFromRun(row)
+      if (!ACTIVE.includes(now.status)) return { status: "finished" }
+    }
+  }
+  const [saved] = await db
+    .update(videoExport)
+    .set({ status: "cancelled", finishedAt: new Date() })
+    .where(and(eq(videoExport.id, row.id), inArray(videoExport.status, ACTIVE)))
+    .returning()
+  if (!saved) return { status: "finished" }
+
+  const value = await toVideoExport(saved)
+  await publish(projectChannel(projectId), { type: "export", export: value })
+  return { status: "cancelled", export: value }
 }
 
 /**

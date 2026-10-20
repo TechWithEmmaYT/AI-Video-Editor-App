@@ -411,6 +411,17 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
 - **Done:** auth, home/new-project, project doc schema + ops reducer (`lib/project/schema.ts`, `ops.ts`), `POST /api/projects/[id]/ops` (version-checked save), editor store (`stores/editor-store.ts`), editor shell, canvas (Player, zoom/fit), timeline (ruler/scrub, playhead, sections, tracks, move/trim/split, snapping with Shift to bypass, undo/redo, shortcuts, resizable height), media drop.
 - **Media tab:** UI only (react-dropzone zone + empty state). ImageKit upload, `/api/imagekit/auth`, `/api/projects/[id]/media` and the media cards are built by hand, outside this plan's automation. `media` table migration `0002_media.sql` is generated, not yet applied.
 - **Not yet:** live updates (SSE), MCP tools + `editor_state`, Settings account card, export.
+- **2026-10-20 — Preview performance + export confirm/cancel:**
+  - Measured with CPU profiles of a copy of the 43-clip reel, playing from the browser cache. On the production build, playback went from 0.51–0.59× real time to 0.98× in two of three runs (0.70× in the third).
+  - Fixes:
+    - Every timeline clip's context menu subscribed to the playhead frame (it now subscribes to a yes/no "can split"), and so did the selection outline. That was the biggest cost.
+    - `<Main>` is memoized for the Player.
+    - Audio clips premount 3 s early (`AUDIO_PREMOUNT_SECONDS`): the sound effects decoded too late, and the Player paused to wait for them.
+    - Code clips: the canvas is resized only when its size changes, otherwise `ctx.reset()` (it was reallocated every frame); `M` is created once per clip.
+  - Premounted code clips draw once: Remotion freezes their frame.
+  - Export is unchanged: 12 rendered frames from the old and new bundles are byte-identical.
+  - Dev stays slower than production (React Strict Mode double renders and dev render logging).
+  - **Export:** Export now asks for confirmation first (shadcn Alert Dialog). A running export has **Cancel export** (`DELETE /api/projects/[id]/exports/[exportId]` → `runs.cancel`, status `cancelled`). The button shows "Starting…" while the export starts.
 - **2026-10-20 — Export, step 3 (HLS + share page):** `hlsUrl`, the `/share/[exportId]` page with ImageKit's player and "Processing…" polling, the public stream check, and Copy share link in the Export menu (§9.1). Verified in Chrome: the share page streams the 720p HLS rendition and plays. Found while testing: the ImageKit account answered 403 "Video transformations limit exceeded" for a new thumbnail, so new HLS streams fall back to the MP4 until the quota resets.
 - **2026-10-20 — Export, step 2 (render, upload, progress):**
   - `export` table (`db/app-schema.ts` `videoExport`, migration `0008_export.sql`, not yet applied).

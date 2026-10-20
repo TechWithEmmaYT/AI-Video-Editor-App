@@ -2,12 +2,18 @@
 
 import { Player, type PlayerRef } from "@remotion/player"
 import { ScanIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { memo, useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "cn"
 
 import { clipEnd } from "@/lib/project/edit"
 import { Main, type MainProps } from "@/remotion/main"
 import { useEditorStore, useSelectedClip } from "@/stores/editor-store"
+
+/**
+ * The composition, memoized for the Player: the Player re-renders its child on every frame, and
+ * <Main> would rebuild all its <Sequence>s each time. Its props (the doc) only change on edits.
+ */
+const PlayerMain = memo(Main)
 
 // Space around the video. The zoom control floats over the canvas, so no room is reserved for it.
 const PAD = { x: 16, top: 16, bottom: 16 }
@@ -56,7 +62,7 @@ export function Canvas() {
           <div className="relative" style={{ width: width * scale, height: height * scale }}>
             <Player
               ref={playerRef}
-              component={Main}
+              component={PlayerMain}
               inputProps={inputProps}
               durationInFrames={Math.max(1, durationInFrames)}
               fps={fps}
@@ -139,8 +145,9 @@ function usePlayerSync() {
 /** Outlines the selected clip while it's on screen (no canvas dragging in v1). */
 function SelectionOutline({ scale }: { scale: number }) {
   const clip = useSelectedClip()
-  const frame = useEditorStore((state) => state.frame)
-  if (!clip || clip.type === "audio" || frame < clip.from || frame >= clipEnd(clip)) return null
+  // Whether it's on screen, not the frame itself, so playback doesn't re-render this every frame.
+  const onScreen = useEditorStore((state) => !!clip && state.frame >= clip.from && state.frame < clipEnd(clip))
+  if (!clip || clip.type === "audio" || !onScreen) return null
 
   const { x, y, width, height, rotation, scale: clipScale } = clip.transform
   return (
