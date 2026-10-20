@@ -1,6 +1,7 @@
-import { bigint, doublePrecision, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import { bigint, doublePrecision, index, integer, jsonb, pgTable, real, text, timestamp } from "drizzle-orm/pg-core"
 
 import type { ElementCategory, ElementLayout } from "@/lib/elements/types"
+import type { ExportStatus } from "@/lib/export/types"
 import type { ParamDef } from "@/lib/project/schema"
 import type { Transcript } from "@/lib/transcript"
 import type { MediaKind, ProjectDoc, ProjectFormat } from "@/types/project"
@@ -105,6 +106,32 @@ export const claudeStatus = pgTable("claude_status", {
     .references(() => user.id, { onDelete: "cascade" }),
   lastSeenAt: timestamp("last_seen_at").notNull(),
 })
+
+/** A rendered MP4 of a project (see the plan, §9). The render runs as a Trigger.dev task. */
+export const videoExport = pgTable(
+  "export",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: text("status").$type<ExportStatus>().notNull().default("queued"),
+    /** 0–1 while rendering. */
+    progress: real("progress").notNull().default(0),
+    triggerRunId: text("trigger_run_id"),
+    mp4Url: text("mp4_url"),
+    imagekitFileId: text("imagekit_file_id"),
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    finishedAt: timestamp("finished_at"),
+  },
+  (table) => [index("export_projectId_createdAt_idx").on(table.projectId, table.createdAt)]
+)
 
 /** What the user has open in the editor, so Claude can resolve "this" (see the plan, §8). */
 export const editorState = pgTable("editor_state", {

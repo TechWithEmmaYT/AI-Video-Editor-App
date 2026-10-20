@@ -4,7 +4,7 @@ import { memoryBus } from "@/lib/realtime/memory-bus"
 import { redisBus } from "@/lib/realtime/redis-bus"
 import type { EventBus } from "@/lib/realtime/types"
 
-export type { MediaEvent, OpsEvent, ProjectEvent } from "@/lib/realtime/types"
+export type { ExportEvent, MediaEvent, OpsEvent, ProjectEvent } from "@/lib/realtime/types"
 
 /*
  * Live updates (see the plan, §5.3). Locally (no REDIS_URL) events stay in this process's memory;

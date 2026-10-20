@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# trigger.dev
+.trigger
+
+# remotion export bundle (npm run remotion:bundle)
+.remotion-bundle

@@ -15,7 +15,8 @@ import {
 import { fontStack, loadFont } from "@/lib/fonts"
 import { CodeClipView } from "@/remotion/code-clip"
 import { originalMediaUrl } from "@/lib/media-url"
-import type { AudioClip, Clip, Doc, TextClip } from "@/lib/project/schema"
+import type { AudioClip, Clip, Doc, TextClip, VideoClip } from "@/lib/project/schema"
+import { clipAt, groupVideoRuns } from "@/lib/project/video-runs"
 
 /*
  * The video itself. The editor's Player and the export render both use this component,
@@ -44,11 +45,30 @@ export function Main({ doc, preview = false }: MainProps) {
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       {/* Premounted a second early so media has loaded by the time the playhead gets there;
           otherwise the Player pauses to buffer. Premounting needs the default layout. */}
-      {clips.map((clip) => (
-        <Sequence key={clip.id} name={clip.name} from={clip.from} durationInFrames={clip.durationInFrames} premountFor={fps}>
-          <ClipView clip={clip} preview={preview} />
-        </Sequence>
-      ))}
+      {/* Runs of short clips that play one video continuously share a single <Video> (see video-runs.ts). */}
+      {groupVideoRuns(clips).map((item) => {
+        if (item.type === "clip") {
+          const { clip } = item
+          return (
+            <Sequence key={clip.id} name={clip.name} from={clip.from} durationInFrames={clip.durationInFrames} premountFor={fps}>
+              <ClipView clip={clip} preview={preview} />
+            </Sequence>
+          )
+        }
+        const first = item.clips[0]
+        const last = item.clips[item.clips.length - 1]
+        return (
+          <Sequence
+            key={`run:${first.id}`}
+            name={`${first.name} (${item.clips.length} clips)`}
+            from={first.from}
+            durationInFrames={last.from + last.durationInFrames - first.from}
+            premountFor={fps}
+          >
+            <VideoRunView clips={item.clips} preview={preview} />
+          </Sequence>
+        )
+      })}
     </AbsoluteFill>
   )
 }
@@ -96,6 +116,27 @@ function ClipView({ clip, preview }: { clip: Clip; preview: boolean }) {
         </Layer>
       )
   }
+}
+
+/**
+ * Several continuous clips of one video as a single <Video> (one decoder): the file plays straight
+ * through while each frame takes its box, radius and volume from the clip on screen then.
+ */
+function VideoRunView({ clips, preview }: { clips: VideoClip[]; preview: boolean }) {
+  const frame = useCurrentFrame()
+  const active = clipAt(clips, frame)
+  return (
+    <Layer clip={active} radius={active.radius}>
+      <Video
+        src={originalMediaUrl(clips[0].src)}
+        trimBefore={clips[0].trimStartFrames}
+        volume={(f) => clipAt(clips, f).volume}
+        objectFit={active.fit}
+        style={{ width: "100%", height: "100%" }}
+        fallbackOffthreadVideoProps={preview ? { onError: warnMediaError(clips[0].name) } : undefined}
+      />
+    </Layer>
+  )
 }
 
 /** Positions a clip's box from its transform. The content inside only fills the box. */

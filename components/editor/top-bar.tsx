@@ -1,11 +1,12 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { ChevronDownIcon, ChevronLeftIcon, CropIcon, UploadIcon } from "lucide-react"
+import { ChevronDownIcon, ChevronLeftIcon, CropIcon } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { cn } from "cn"
 
+import { ExportMenu } from "@/components/editor/export-menu"
 import { ThemeToggle } from "@/components/nav/theme-toggle"
 import {
   DropdownMenu,
@@ -16,7 +17,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { queryKeys } from "@/lib/api"
 import { changeFormatOps } from "@/lib/project/edit"
 import { FORMAT_ORDER, FORMATS } from "@/lib/project/formats"
@@ -39,22 +39,7 @@ export function TopBar() {
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
         <FormatMenu />
-        {/* Export (Trigger.dev render) arrives in a later phase. */}
-        <Tooltip>
-          <TooltipTrigger
-            render={<span />}
-            className="flex h-10 items-center overflow-hidden rounded-full bg-muted text-sm font-semibold opacity-60"
-          >
-            <span className="flex items-center gap-2 px-4">
-              <UploadIcon className="size-4" />
-              Export
-            </span>
-            <span className="grid h-full place-items-center border-l border-border px-2.5">
-              <ChevronDownIcon className="size-4" />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>Export comes in a later step</TooltipContent>
-        </Tooltip>
+        <ExportMenu />
       </div>
     </header>
   )

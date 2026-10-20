@@ -1,6 +1,7 @@
 import axios, { isAxiosError } from "axios"
 
 import { authClient } from "@/lib/auth-client"
+import type { StreamStatus } from "@/lib/export/types"
 import type { Op } from "@/lib/project/ops"
 import type { SaveElementInput } from "@/lib/elements/validation"
 import type { Transcript } from "@/lib/transcript"
@@ -13,6 +14,8 @@ import type {
   ClaudeStatusResponse,
   ElementResponse,
   ElementsResponse,
+  ExportResponse,
+  ExportsResponse,
   ImagekitAuthResponse,
   MediaListResponse,
   MediaResponse,
@@ -51,6 +54,8 @@ export const queryKeys = {
   projects: ["projects"] as const,
   project: (id: string) => ["projects", id] as const,
   media: (projectId: string) => ["projects", projectId, "media"] as const,
+  exports: (projectId: string) => ["projects", projectId, "exports"] as const,
+  streamStatus: (exportId: string) => ["share", exportId, "stream"] as const,
   elements: ["elements"] as const,
   claudeStatus: ["claude", "status"] as const,
   apiKeys: ["api-keys"] as const,
@@ -119,6 +124,26 @@ export async function saveTranscriptMutationFn({ projectId, mediaId, transcript 
 
 export async function removeTranscriptMutationFn({ projectId, mediaId }: { projectId: string; mediaId: string }) {
   const { data } = await api.delete<TranscriptResponse>(`/projects/${projectId}/media/${mediaId}/transcript`)
+  return data
+}
+
+// ── Exports ─────────────────────────────────────────────────────────────
+
+/** The project's recent exports, newest first. Live progress arrives as `export` events (useProjectEvents). */
+export async function getExportsQueryFn(projectId: string) {
+  const { data } = await api.get<ExportsResponse>(`/projects/${projectId}/exports`)
+  return data.exports
+}
+
+/** Export now: starts rendering the project as it is now. */
+export async function startExportMutationFn(projectId: string) {
+  const { data } = await api.post<ExportResponse>(`/projects/${projectId}/exports`)
+  return data.export
+}
+
+/** Public: whether a shared export's HLS streams are ready (the first call starts preparing them). */
+export async function getStreamStatusQueryFn(exportId: string) {
+  const { data } = await api.get<StreamStatus>(`/share/${exportId}/stream`)
   return data
 }
 

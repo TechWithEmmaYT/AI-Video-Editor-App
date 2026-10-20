@@ -1,4 +1,5 @@
 import type { ElementDef } from "@/lib/elements/types"
+import type { VideoExport } from "@/lib/export/types"
 import type { Op } from "@/lib/project/ops"
 import type { Media, Project, ProjectWithDoc } from "@/types/project"
 
@@ -19,6 +20,8 @@ export type ImagekitAuthResponse = {
   publicKey: string
   folder: string
 }
+export type ExportsResponse = { exports: VideoExport[] }
+export type ExportResponse = { export: VideoExport }
 export type MediaListResponse = { media: Media[] }
 export type MediaResponse = { media: Media }
 export type ElementsResponse = { elements: ElementDef[] }

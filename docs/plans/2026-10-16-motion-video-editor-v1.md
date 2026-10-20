@@ -59,11 +59,11 @@ NEXT_PUBLIC_APP_URL=
 NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY=
 NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT=
 IMAGEKIT_PRIVATE_KEY=
+TRIGGER_PROJECT_REF=          # read by trigger.config.ts
 TRIGGER_SECRET_KEY=
-INTERNAL_CALLBACK_SECRET=     # HMAC for task → app callbacks
 REDIS_URL=                    # PRODUCTION ONLY. Unset locally ⇒ in-memory bus
 ```
-Trigger.dev env (synced): `DATABASE_URL`, `IMAGEKIT_*`, `APP_URL`, `INTERNAL_CALLBACK_SECRET`.
+Trigger.dev env (synced): `IMAGEKIT_PRIVATE_KEY` (the render task only uploads; it never touches Neon or calls the app).
 
 ---
 
@@ -90,7 +90,6 @@ app/
   api/projects/[id]/exports/route.ts
   api/imagekit/auth/route.ts
   api/editor-state/route.ts
-  api/internal/exports/route.ts        # Trigger callback (HMAC)
 types/   project.ts api.ts                # shared TS types (client + server)
 lib/
   api.ts                               # axios instance, queryKeys, every queryFn/mutationFn
@@ -203,7 +202,7 @@ interface EventBus {
   subscribe(channel: string, lastEventId: string | null, on: (id, e) => void): Promise<() => void>
 }
 ```
-- **Local (`REDIS_URL` unset): `memory-bus.ts`.** `Map<channel, Set<listener>>` plus a ring buffer of the last 200 events per channel for `Last-Event-ID` replay. Stored on `globalThis` so it survives HMR. The Trigger dev worker reaches it via the HTTP callback (§9), so a single process is enough.
+- **Local (`REDIS_URL` unset): `memory-bus.ts`.** `Map<channel, Set<listener>>` plus a ring buffer of the last 200 events per channel for `Last-Event-ID` replay. Stored on `globalThis` so it survives HMR. Export progress doesn't use the bus: the editor watches the Trigger.dev run directly (§9).
 - **Production (`REDIS_URL` set): `redis-bus.ts`**, following Vercel's realtime guide:
   - publish: `XADD stream:{channel} MAXLEN ~ 200 * e <json>` then `PUBLISH {channel} <id>`.
   - subscribe: `XRANGE` after `lastEventId` for replay, then one shared subscriber connection per instance, ref-counted per channel, fanning out to local listeners.
@@ -378,25 +377,31 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
 
 ## 9. Export (Trigger.dev + Remotion + ImageKit)
 
-1. `POST /api/projects/:id/exports` inserts an `export` row (`queued`), runs `tasks.trigger('render-video', { exportId })`, and stores `triggerRunId`. The queue uses a `concurrencyKey` of `userId`, so each user has at most 1 render at a time.
+1. `POST /api/projects/:id/exports` inserts an `export` row (`queued`), runs `tasks.trigger('render-video', payload)` with a snapshot of the doc (plus size, fps, length, name, ids), and stores `triggerRunId`. The `renders` queue (limit 1) is triggered with `concurrencyKey: userId`, so each user has at most 1 render at a time; a project already exporting answers 409.
 2. **`trigger/render-video.ts`:**
-   - Loads the export and project from Neon.
-   - `selectComposition({ serveUrl: <bundle dir>, id: 'Main', inputProps })`, then `renderMedia({ codec: 'h264', outputLocation: '/tmp/<id>.mp4', browserExecutable: process.env.PUPPETEER_EXECUTABLE_PATH ?? null, onProgress })`.
-   - Progress is throttled to about one update per second and sent as a callback.
-   - Uploads to ImageKit with `@imagekit/nodejs` (folder `/motion/{userId}/exports/`).
-   - `mp4Url` is the file URL plus `?ik-attachment=true` for download. `hlsUrl` is `{url}/ik-master.m3u8?tr=sr-240_360_480_720_1080`.
+   - Renders the doc snapshot from the payload. The task never touches Neon or calls the app.
+   - `selectComposition({ serveUrl: <bundle dir>, id: 'Main', inputProps })`, then `renderMedia({ codec: 'h264', outputLocation: '/tmp/<id>.mp4', browserExecutable: process.env.PUPPETEER_EXECUTABLE_PATH ?? null, onProgress })`. With that Chrome it passes `chromeMode: 'chrome-for-testing'` (Remotion then uses `--headless=new`; current Chrome has no old headless mode). Frames wait up to 120 s for media.
+   - Progress goes into the run's metadata (`step`: rendering/uploading, `progress` 0–1), about once a second. The result is the run's output (`mp4Url`, `imagekitFileId`); a failure is the run's error. `@remotion/renderer` and `@imagekit/nodejs` are imported inside `run` (slow imports).
+   - Uploads to ImageKit with `@imagekit/nodejs` (folder `/motion/{userId}/{projectId}/exports/`).
+   - `mp4Url` is the file URL plus `?ik-attachment=true` for download. `hlsUrl` is `{url}/ik-master.m3u8?tr=sr-360_720` (two renditions to keep video processing units low), computed from `mp4Url` (`lib/export/urls.ts`), not stored.
    - Marks the row `done`, or `failed` with the error.
-3. **Callback `POST /api/internal/exports`** checks the HMAC (`INTERNAL_CALLBACK_SECRET`), updates the row and publishes an `export` event. This works in both local dev (the separate `trigger dev` process calls localhost) and production.
+3. **Live progress: Trigger.dev Realtime.** Each unfinished export comes with `live: { runId, accessToken }` (`auth.createPublicToken`, read-only for that run, 1 h). The Export menu subscribes with `useRealtimeRun` (`@trigger.dev/react-hooks`, skipping payload/output). When the run ends (done or failed), it refetches the list and shows a toast (success with Download, or the error).
+   - **Saving:** whenever the app reads exports (`listExports`, and before starting one), it syncs unfinished rows from `runs.retrieve`: COMPLETED → done with the output; FAILED/CRASHED/SYSTEM_FAILURE/CANCELED/EXPIRED/TIMED_OUT → failed with a plain message (`friendlyError`: took too long / media didn't load / couldn't be saved / something went wrong). Changes publish an `export` event so other tabs update.
+   - Runs have `ttl: "30m"`, so a render that never starts (worker not running) expires and shows as failed.
 4. **Build:**
-   - `scripts/bundle-remotion.ts` (`@remotion/bundler`) writes `.remotion-bundle/`.
+   - `scripts/bundle-remotion.mjs` (`npm run remotion:bundle`, `@remotion/bundler`, `@` alias to the root) bundles `remotion/index.ts` → `remotion/root.tsx` (`Main` with `calculateMetadata` from the props) into `.remotion-bundle/`. `trigger:dev` and `trigger:deploy` run it first.
    - `trigger.config.ts` uses the extensions `puppeteer()` (installs Chrome on deploy and sets `PUPPETEER_EXECUTABLE_PATH`) and `additionalFiles({ files: ['.remotion-bundle/**'] })`.
    - Remotion ships its own ffmpeg, so add `ffmpeg()` only if the spike shows it's needed.
    - Locally, Remotion downloads chrome-headless-shell itself.
-   - Machine: start at a large preset, `maxDuration` about 900 s.
+   - `@remotion/renderer` is in `build.external` (native binaries per platform). `legacyDevProcessCwdBehaviour: false`, so the bundle is at `process.cwd()` in dev and deploy.
+   - Machine: `medium-2x`, `maxDuration` 900 s, no retries (Retry starts a new export).
 5. **Export menu** in the editor top bar:
    - Export now.
    - The running export with a progress bar.
-   - A list of past exports with **Download MP4**, **Copy HLS link** and Retry for failed ones.
+   - A list of past finished exports (from the last 10) with **Download MP4** and **Copy share link** (copies `/share/{exportId}` and calls the stream check once, so ImageKit starts preparing HLS early).
+   - A failed export isn't listed: it shows a red toast with a plain message (never the raw error, which goes to the server log and the Trigger.dev dashboard). Export now is the retry.
+   - The button shows the step and percent while the menu is closed; a toast with Download appears when it's done.
+   - Exports not finished after 40 min are marked failed (the worker died).
    - Output: 30 fps, 1080 px on the short side, up to 300 s.
 
 ---
@@ -406,6 +411,23 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
 - **Done:** auth, home/new-project, project doc schema + ops reducer (`lib/project/schema.ts`, `ops.ts`), `POST /api/projects/[id]/ops` (version-checked save), editor store (`stores/editor-store.ts`), editor shell, canvas (Player, zoom/fit), timeline (ruler/scrub, playhead, sections, tracks, move/trim/split, snapping with Shift to bypass, undo/redo, shortcuts, resizable height), media drop.
 - **Media tab:** UI only (react-dropzone zone + empty state). ImageKit upload, `/api/imagekit/auth`, `/api/projects/[id]/media` and the media cards are built by hand, outside this plan's automation. `media` table migration `0002_media.sql` is generated, not yet applied.
 - **Not yet:** live updates (SSE), MCP tools + `editor_state`, Settings account card, export.
+- **2026-10-20 — Export, step 3 (HLS + share page):** `hlsUrl`, the `/share/[exportId]` page with ImageKit's player and "Processing…" polling, the public stream check, and Copy share link in the Export menu (§9.1). Verified in Chrome: the share page streams the 720p HLS rendition and plays. Found while testing: the ImageKit account answered 403 "Video transformations limit exceeded" for a new thumbnail, so new HLS streams fall back to the MP4 until the quota resets.
+- **2026-10-20 — Export, step 2 (render, upload, progress):**
+  - `export` table (`db/app-schema.ts` `videoExport`, migration `0008_export.sql`, not yet applied).
+  - `lib/export/types.ts` (shared with the task), `lib/exports.ts` (start, list, sync from the run, live tokens, `export` events).
+  - Routes: `GET/POST /api/projects/[id]/exports`.
+  - `trigger/render-video.ts`; `remotion/index.ts` + `root.tsx`; `scripts/bundle-remotion.mjs`.
+  - Editor: `components/editor/export-menu.tsx` in the top bar; `use-project-events` handles `export`.
+  - **Changed the same day:** the signed callback (`/api/internal/exports`, `INTERNAL_CALLBACK_SECRET`) was replaced by Trigger.dev Realtime + syncing from the run. A failed run used to leave the button loading because its failure report never arrived. Toasts use `richColors`.
+  - **Fixed:** `__name is not defined` in Chrome. The renderer had been bundled with esbuild `keepNames`; now it's `external` and `keepNames: false`. Restart `trigger dev` after config changes.
+  - Verified locally: the bundle builds (~30 s) and renders the first 3 s of a real 9:16 project to MP4 (76 s on a slow link to ImageKit). A full run through Trigger.dev reached the render (then hit the `__name` bug, since fixed); not yet run to a finished upload.
+- **2026-10-20 — Export, step 1 (Trigger.dev setup):**
+  - `@trigger.dev/sdk`, `@trigger.dev/build` and the `trigger.dev` CLI, all pinned to 4.7.5.
+  - `trigger.config.ts` (tasks in `trigger/`, maxDuration 900 s, no retries in dev). It reads `TRIGGER_PROJECT_REF` from `.env.local`, because the CLI doesn't load env files before the config.
+  - Test task `trigger/hello.ts` (`hello`), plus `POST /api/trigger-test` (signed in only) to fire it from the app. Both are removed once export works.
+  - Scripts `trigger:dev` and `trigger:deploy`; `.trigger` is git-ignored; env fields `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY`.
+  - **Video runs:** continuous video clips (same file, track and fit, back to back in time and source) play as one `<Video>` (`lib/project/video-runs.ts`), so a punch-in done as many short clips uses one decoder.
+  - **Next:** the render spike (§10, Phase 9), a 3-second render on Trigger.dev with `puppeteer()`.
 - **2026-10-25 — MCP tools + live updates:**
   - **Live updates:** `lib/realtime/bus.ts` is the in-memory bus (globalThis, 200-event replay; the Redis bus is still to do for production). `applyProjectOps` publishes every saved batch (with origin) and Claude's `add_media_from_url` publishes `media` events. `GET /api/projects/[id]/events` is the SSE route (hello with the version, 15 s ping, closes at ~290 s). `use-project-events` applies remote ops, skips its own echo, and reloads via `GET /api/projects/[id]/doc` on a gap or failure.
   - **"this":** the `editor_state` table (migration `0007_editor_state.sql`), `POST /api/editor-state` (editor reports project + selection, debounced 300 ms), and `lib/agent/resolve.ts`.
@@ -464,6 +486,14 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
   - **ImageKit:** media plays with `?tr=orig-true` (no video processing units); one `ik-thumbnail.jpg` per video, shared by the media card and the timeline clip.
 - **Media drag contract:** cards call `setMediaDragData(e, media)` from `lib/media-drag.ts` (type `application/x-motion-media`, payload `{ id, kind, name, url, thumbnailUrl, width, height, durationSec }`). The timeline turns a drop into ops with `planMediaDrop` (`lib/project/drop.ts`, unit-tested): clip at the drop frame, length from `durationSec` (images 5 s), audio to the bottom audio track, new tracks as needed, project grows to fit.
 - **Remotion:** follow the `remotion-best-practices` skill — `<Video>`/`<Audio>` from `@remotion/media`, `<CanvasImage>` for stills, keep per-frame state out of the component that renders `<Player>`.
+
+### 9.1 Share page (`/share/[exportId]`)
+- Public, no sign-in (the proxy only guards `/app`); anyone with the link can watch. The id is a random UUID; only `done` exports are found (`getSharedExport`). `noindex`. Title is the project name.
+- Shows the video, the project name, "Exported … ago" and **Download MP4**.
+- **Stream check** `GET /api/share/[exportId]/stream` (public): the server fetches the HLS playlist. ImageKit's 202 means "processing", 200 means "ready", anything else means "unavailable". The browser only polls this route.
+- **Player** (`components/share/share-player.tsx`): shows "Processing…" and polls every 4 s while ImageKit prepares the streams (gives up after 10 min). When ready it uses ImageKit's player (`@imagekit/video-player`, Video.js) via its core `videoPlayer()` with `abs: { protocol: "hls", sr: [360, 720] }` (the same URL as `hlsUrl`, so it's prepared once) and `seekThumbnails: false`. If the stream is unavailable, or the player errors, it plays the original MP4 (`?tr=orig-true`).
+- **Not the `IKVideoPlayer` React wrapper:** that beta (React 17/18) re-initialises on its own `<video>` after Video.js removed it, and crashes under React 19 Strict Mode or on option changes. `package.json` `overrides` lets the package install next to React 19 (the core entry doesn't use React).
+- The player still requests one poster thumbnail (`ik-thumbnail.jpg`, video units). Later: render a poster still in the task (an image upload, no video units) and pass it as `poster.src`.
 
 ## 10. Phases
 
@@ -547,7 +577,7 @@ Each phase ends with `npm run typecheck && npm run lint` (add a `typecheck` scri
 
 ### Phase 9 — Export
 - **Spike first:** deploy a minimal `render-video` that renders a 3-second test composition on Trigger.dev cloud with `puppeteer()`. Confirm the Chrome path, that no ffmpeg extension is needed, and the render time.
-- Then build the full task, bundle script, callback route and export menu.
+- Then build the full task, bundle script and export menu (live progress via Trigger.dev Realtime).
 - ✅ Exporting a 15-second 16:9 project produces a playable MP4 download link and an HLS link that plays. Progress shows live, and failures show the error and a Retry button.
 
 ### Phase 10 — Deploy and QA

@@ -1,3 +1,4 @@
+import type { VideoExport } from "@/lib/export/types"
 import type { Op } from "@/lib/project/ops"
 
 /** A file was added to the project (by Claude): the Media tab refreshes. */
@@ -13,7 +14,10 @@ export type OpsEvent = {
   source: "editor" | "claude"
 }
 
-export type ProjectEvent = OpsEvent | MediaEvent
+/** An export started or moved on (rendering progress, uploading, done, failed). */
+export type ExportEvent = { type: "export"; export: VideoExport }
+
+export type ProjectEvent = OpsEvent | MediaEvent | ExportEvent
 
 export type Listener = (id: string, event: ProjectEvent) => void
 

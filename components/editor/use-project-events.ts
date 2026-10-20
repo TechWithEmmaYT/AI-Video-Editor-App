@@ -4,7 +4,8 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
 
 import { getProjectDocQueryFn, queryKeys } from "@/lib/api"
-import type { OpsEvent } from "@/lib/realtime/bus"
+import type { VideoExport } from "@/lib/export/types"
+import type { ExportEvent, OpsEvent } from "@/lib/realtime/bus"
 import { clientId, useEditorStore } from "@/stores/editor-store"
 
 /**
@@ -46,6 +47,15 @@ export function useProjectEvents(projectId: string) {
 
     // Claude added a file: refresh the Media tab.
     source.addEventListener("media", () => void queryClient.invalidateQueries({ queryKey: queryKeys.media(projectId) }))
+
+    // An export was started or saved (from another tab too): update it in the Export menu's list.
+    // Live progress itself comes from the Trigger.dev run (see export-menu.tsx).
+    source.addEventListener("export", (message) => {
+      const { export: next } = JSON.parse((message as MessageEvent).data) as ExportEvent
+      queryClient.setQueryData<VideoExport[]>(queryKeys.exports(projectId), (list = []) =>
+        [next, ...list.filter((item) => item.id !== next.id)].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      )
+    })
 
     return () => source.close()
   }, [projectId, queryClient])

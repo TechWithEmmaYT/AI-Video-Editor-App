@@ -21,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ImageKitProvider urlEndpoint={envConfig.imagekit.urlEndpoint}>
         <TooltipProvider>{children}</TooltipProvider>
         </ImageKitProvider>
-        <Toaster position="top-center" />
+        <Toaster position="top-center" richColors />
       </ThemeProvider>
     </QueryClientProvider>
   )
