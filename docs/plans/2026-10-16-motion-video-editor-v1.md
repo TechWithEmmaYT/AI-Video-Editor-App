@@ -102,7 +102,7 @@ lib/
   realtime/ bus.ts memory-bus.ts redis-bus.ts sse.ts use-project-events.ts
   code-clips/ validate.ts instrument.ts compile.ts helpers.ts params.ts
   elements/ builtin/*.ts index.ts
-  mcp/ tools.ts resolve.ts
+  agent/ connect.ts (connect command) status.ts (Claude last seen) tools.ts resolve.ts   # everything MCP
   imagekit.ts fonts.ts colors.ts
 remotion/
   index.ts Root.tsx Main.tsx ClipLayer.tsx
@@ -404,7 +404,27 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
 
 - **Done:** auth, home/new-project, project doc schema + ops reducer (`lib/project/schema.ts`, `ops.ts`), `POST /api/projects/[id]/ops` (version-checked save), editor store (`stores/editor-store.ts`), editor shell, canvas (Player, zoom/fit), timeline (ruler/scrub, playhead, sections, tracks, move/trim/split, snapping with Shift to bypass, undo/redo, shortcuts, resizable height), media drop.
 - **Media tab:** UI only (react-dropzone zone + empty state). ImageKit upload, `/api/imagekit/auth`, `/api/projects/[id]/media` and the media cards are built by hand, outside this plan's automation. `media` table migration `0002_media.sql` is generated, not yet applied.
-- **Not yet:** live updates (SSE), Style/Motion inspectors, Text/Elements/Claude tabs, code clips, MCP, export.
+- **Not yet:** live updates (SSE), MCP tools + `editor_state`, Settings key list/revoke, export.
+- **2026-10-22 — Claude tab + MCP connection (no tools yet):**
+  - **Claude tab:** status dot (Not connected / Connected · seen … / Working… within 10 s), Create key dialog (name, 7 days / 30 days / Never; key shown once with the filled-in command), and "this" (project + selected clip).
+  - **MCP route:** `/api/mcp` (`mcp-handler` 2 + `withMcpAuth`, API key as bearer) accepts connections and records `claude_status.lastSeenAt`. It registers no tools yet.
+  - **Migration:** `0004_claude_status.sql` generated, not yet applied.
+  - **Interim:** status is polled from `GET /api/claude/status` every 5 s while the tab is open, until the realtime phase replaces it with `claude` events.
+  - **Fixes:** the connect command now has `--scope user`. API-key expiry: the plugin has no default (it read `defaultExpiresIn` as seconds and overrode "Never"); the UI always sends the expiry.
+- **2026-10-21 — code clips & elements (Phase 6 + Elements panel):**
+  - **Safety layers:** `lib/code-clips/` `validate.ts` (acorn allow-list with real scopes), `instrument.ts` (magic-string: `__g`/`__s`/`__tick`), `compile.ts` (runtime guards, 200k ticks / 50 ms). Tests cover the §11 escape attempts.
+  - **Runtime:** `helpers.ts` (`M`), `params.ts`, `assets.ts` (ImageKit-only images, DOMPurify'd SVG), `remotion/code-clip.tsx` (canvas sized to on-screen scale × dpr, ×1 in export; red error box + Style-tab error).
+  - **Server check:** the ops route rejects new or changed code that fails the validator (`changedCodeError`).
+  - **Elements:** 15 built-ins in `lib/elements/builtin/` (tested: validate, draw, valid clip in every format). Elements tab: search, chips, 2-col live previews, click/drag to add.
+  - **"Mine":** `element` table plus a `layout` column (where the box goes); migration `0003_element.sql` generated, not yet applied. `GET/POST /api/elements`, Save as element in the code Style tab.
+  - **Decision (2026-10-21):** the code is **read-only** in the Style tab (user: "nobody should edit it"); it's changed through parameters, fonts, opacity/radius, and Claude.
+- **2026-10-20:**
+  - **Done:** Text presets (`lib/project/text-presets.ts`: Title, Subtitle, Body, Caption, Label, Quote; click adds at the playhead on the top free track, drag uses `lib/text-drag.ts`).
+  - **Done:** curated fonts (`lib/fonts.ts`, 20 Google Fonts via `@remotion/google-fonts`; export render waits on them).
+  - **Done:** Style inspectors for text/video/image/audio and the Motion inspector (`components/editor/inspector/`).
+  - **Done:** Replace source (`replaceSourceOps`, reusing the Media panel upload).
+  - **Previews:** fields preview live through `preview`/`commitPreview` in the editor store, then commit one op.
+  - **ImageKit:** media plays with `?tr=orig-true` (no video processing units); one `ik-thumbnail.jpg` per video, shared by the media card and the timeline clip.
 - **Media drag contract:** cards call `setMediaDragData(e, media)` from `lib/media-drag.ts` (type `application/x-motion-media`, payload `{ id, kind, name, url, thumbnailUrl, width, height, durationSec }`). The timeline turns a drop into ops with `planMediaDrop` (`lib/project/drop.ts`, unit-tested): clip at the drop frame, length from `durationSec` (images 5 s), audio to the bottom audio track, new tracks as needed, project grows to fit.
 - **Remotion:** follow the `remotion-best-practices` skill — `<Video>`/`<Audio>` from `@remotion/media`, `<CanvasImage>` for stills, keep per-frame state out of the component that renders `<Player>`.
 

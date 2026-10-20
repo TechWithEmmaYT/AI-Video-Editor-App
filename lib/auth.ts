@@ -25,7 +25,10 @@ export const auth = betterAuth({
     // Keys are what Claude Code sends over MCP.
     apiKey({
       defaultPrefix: "motion_",
-      keyExpiration: { defaultExpiresIn: 7 * DAY * 1000 },
+      // No default: the UI always sends one (7 days by default, 30 days, or none for "Never").
+      // A default would also override "Never" (the plugin treats a null expiresIn as "use the default"),
+      // and despite its docs it reads defaultExpiresIn as seconds, not milliseconds.
+      keyExpiration: { defaultExpiresIn: null },
       // The plugin default is 10 requests per day, far too low for an agent making tool calls.
       rateLimit: { enabled: true, timeWindow: 60 * 1000, maxRequests: 120 },
     }),

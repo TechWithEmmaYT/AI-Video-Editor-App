@@ -152,6 +152,7 @@ export type ImageClip = z.infer<typeof imageClipSchema>
 export type AudioClip = z.infer<typeof audioClipSchema>
 export type TextClip = z.infer<typeof textClipSchema>
 export type CodeClip = z.infer<typeof codeClipSchema>
+export type ParamDef = z.infer<typeof paramDefSchema>
 export type Clip = z.infer<typeof clipSchema>
 export type ClipType = Clip["type"]
 export type Track = z.infer<typeof trackSchema>

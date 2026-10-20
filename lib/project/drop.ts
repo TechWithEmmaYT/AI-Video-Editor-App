@@ -60,16 +60,7 @@ export function planMediaDrop(state: ProjectData, media: MediaDragPayload, optio
     const reuse = bottom && isAudioTrack(doc, bottom.id) && isRangeFree(doc, bottom.id, from, durationInFrames)
     trackId = reuse ? bottom.id : addTrack(doc.tracks.length)
   } else {
-    const limit = audioZoneStart(doc)
-    if (target.kind === "track") {
-      const index = doc.tracks.findIndex((track) => track.id === target.trackId)
-      trackId =
-        index !== -1 && isRangeFree(doc, target.trackId, from, durationInFrames)
-          ? target.trackId
-          : addTrack(Math.min(Math.max(index, 0), limit))
-    } else {
-      trackId = addTrack(Math.min(Math.max(target.index, 0), limit))
-    }
+    trackId = chooseVisualTrack(doc, target, from, durationInFrames, addTrack)
   }
 
   const sourceDurationInFrames = media.durationSec ? Math.max(1, Math.round(media.durationSec * fps)) : null
@@ -106,6 +97,34 @@ export function planMediaDrop(state: ProjectData, media: MediaDragPayload, optio
   if (end > state.durationInFrames) ops.push({ type: "updateProject", patch: { durationInFrames: end } })
 
   return { ops, clipId: clip.id, trackId }
+}
+
+/**
+ * The track a visual clip (video, image, text…) goes on:
+ * - dropped on a track: that track if the spot is free, otherwise a new track just above it;
+ * - dropped in a gap: a new track there;
+ * - no target (added by click): the top track that's free at that time, otherwise a new top track.
+ * New visual tracks never go below the audio tracks at the bottom.
+ */
+export function chooseVisualTrack(
+  doc: ProjectData["doc"],
+  target: DropTarget | null,
+  from: number,
+  duration: number,
+  addTrack: (index: number) => string
+) {
+  const limit = audioZoneStart(doc)
+  if (!target) {
+    const free = doc.tracks.slice(0, limit).find((track) => isRangeFree(doc, track.id, from, duration))
+    return free ? free.id : addTrack(0)
+  }
+  if (target.kind === "track") {
+    const index = doc.tracks.findIndex((track) => track.id === target.trackId)
+    return index !== -1 && isRangeFree(doc, target.trackId, from, duration)
+      ? target.trackId
+      : addTrack(Math.min(Math.max(index, 0), limit))
+  }
+  return addTrack(Math.min(Math.max(target.index, 0), limit))
 }
 
 /** Reads a drop event's media payload and plans it. Null when the drop isn't a media card. */

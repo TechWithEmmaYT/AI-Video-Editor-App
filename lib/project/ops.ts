@@ -1,16 +1,17 @@
 import { produce, type Draft } from "immer"
 import { z } from "zod"
 
-import { FPS, MAX_SECONDS } from "@/lib/project/formats"
+import { FORMAT_ORDER, FPS, MAX_SECONDS } from "@/lib/project/formats"
 import { clipSchema, sectionSchema, trackSchema, type Clip, type Doc, type Section } from "@/lib/project/schema"
+import type { ProjectFormat } from "@/types/project"
 
 /*
  * Every change to a project is an op. The same pure reducer runs in the editor (instantly),
  * in POST /api/projects/[id]/ops (authoritative) and, later, in the MCP tools.
  */
 
-/** What ops act on: the doc plus the two project columns an op may change. */
-export type ProjectData = { name: string; durationInFrames: number; doc: Doc }
+/** What ops act on: the doc plus the project columns an op may change (width/height follow format). */
+export type ProjectData = { name: string; durationInFrames: number; format: ProjectFormat; doc: Doc }
 
 const id = z.string().min(1).max(64)
 // Patches are shallow records; the full doc is re-validated with docSchema after applying.
@@ -37,6 +38,8 @@ export const opSchema = z.discriminatedUnion("type", [
         .min(1)
         .max(MAX_SECONDS * FPS)
         .optional(),
+      /** Changes the canvas size; send the clips' refitted boxes in the same batch (changeFormatOps). */
+      format: z.enum(FORMAT_ORDER as [ProjectFormat, ...ProjectFormat[]]).optional(),
     }),
   }),
 ])
@@ -109,6 +112,7 @@ function applyOne(state: Draft<ProjectData>, op: Op) {
     case "updateProject": {
       if (op.patch.name !== undefined) state.name = op.patch.name
       if (op.patch.durationInFrames !== undefined) state.durationInFrames = op.patch.durationInFrames
+      if (op.patch.format !== undefined) state.format = op.patch.format
       return
     }
   }
@@ -167,6 +171,7 @@ function invertOne(state: ProjectData, op: Op): Op {
         patch: {
           ...(op.patch.name !== undefined && { name: state.name }),
           ...(op.patch.durationInFrames !== undefined && { durationInFrames: state.durationInFrames }),
+          ...(op.patch.format !== undefined && { format: state.format }),
         },
       }
   }

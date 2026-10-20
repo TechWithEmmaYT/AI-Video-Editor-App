@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm"
 
 import { db } from "@/db"
 import { project } from "@/db/schema"
+import { changedCodeError } from "@/lib/code-clips/doc-check"
 import { FORMATS, FPS } from "@/lib/project/formats"
 import { applyOps, OpError, type Op, type ProjectData } from "@/lib/project/ops"
 import { docSchema, EMPTY_DOC } from "@/lib/project/schema"
@@ -71,7 +72,13 @@ export type ApplyOpsResult =
 export async function applyProjectOps(userId: string, id: string, ops: Op[]): Promise<ApplyOpsResult> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const [row] = await db
-      .select({ name: project.name, durationInFrames: project.durationInFrames, doc: project.doc, version: project.version })
+      .select({
+        name: project.name,
+        durationInFrames: project.durationInFrames,
+        format: project.format,
+        doc: project.doc,
+        version: project.version,
+      })
       .from(project)
       .where(and(eq(project.id, id), eq(project.userId, userId)))
       .limit(1)
@@ -79,17 +86,28 @@ export async function applyProjectOps(userId: string, id: string, ops: Op[]): Pr
 
     let next: ProjectData
     try {
-      next = applyOps({ name: row.name, durationInFrames: row.durationInFrames, doc: row.doc }, ops)
+      next = applyOps({ name: row.name, durationInFrames: row.durationInFrames, format: row.format, doc: row.doc }, ops)
     } catch (error) {
       if (error instanceof OpError) return { status: "invalid", message: error.message }
       throw error
     }
     const checked = docSchema.safeParse(next.doc)
     if (!checked.success) return { status: "invalid", message: checked.error.issues[0]?.message ?? "Invalid project." }
+    // Code clips: run the validator on any code this change wrote (the plan, §7).
+    const codeError = changedCodeError(row.doc, checked.data)
+    if (codeError) return { status: "invalid", message: codeError }
 
     const saved = await db
       .update(project)
-      .set({ name: next.name, durationInFrames: next.durationInFrames, doc: checked.data, version: row.version + 1 })
+      .set({
+        name: next.name,
+        durationInFrames: next.durationInFrames,
+        format: next.format,
+        width: FORMATS[next.format].width,
+        height: FORMATS[next.format].height,
+        doc: checked.data,
+        version: row.version + 1,
+      })
       .where(and(eq(project.id, id), eq(project.userId, userId), eq(project.version, row.version)))
       .returning({ version: project.version })
     if (saved.length) return { status: "ok", version: saved[0].version }

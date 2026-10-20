@@ -4,7 +4,7 @@ import type { Clip, Doc, ImageClip } from "@/lib/project/schema"
 // Shared builders for unit tests.
 
 export function project(doc: Partial<Doc> = {}, durationInFrames = 450): ProjectData {
-  return { name: "Test", durationInFrames, doc: { tracks: [], clips: [], sections: [], ...doc } }
+  return { name: "Test", durationInFrames, format: "16:9", doc: { tracks: [], clips: [], sections: [], ...doc } }
 }
 
 export function imageClip(overrides: Partial<ImageClip> & Pick<Clip, "id" | "trackId">): ImageClip {

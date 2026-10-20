@@ -2,11 +2,16 @@ import axios, { isAxiosError } from "axios"
 
 import { authClient } from "@/lib/auth-client"
 import type { Op } from "@/lib/project/ops"
+import type { SaveElementInput } from "@/lib/elements/validation"
 import type { CreateMediaInput } from "@/lib/project/validation"
 import type {
   ApiError,
   ApplyOpsRequest,
+  ApiKeySummary,
   ApplyOpsResponse,
+  ClaudeStatusResponse,
+  ElementResponse,
+  ElementsResponse,
   ImagekitAuthResponse,
   MediaListResponse,
   MediaResponse,
@@ -43,6 +48,9 @@ export const queryKeys = {
   projects: ["projects"] as const,
   project: (id: string) => ["projects", id] as const,
   media: (projectId: string) => ["projects", projectId, "media"] as const,
+  elements: ["elements"] as const,
+  claudeStatus: ["claude", "status"] as const,
+  apiKeys: ["api-keys"] as const,
 }
 
 // ── Projects ────────────────────────────────────────────────────────────
@@ -88,6 +96,27 @@ export async function createMediaMutationFn({ projectId, ...input }: CreateMedia
   return data.media
 }
 
+// ── Elements ("Mine") ───────────────────────────────────────────────────
+
+export async function getElementsQueryFn() {
+  const { data } = await api.get<ElementsResponse>("/elements")
+  return data.elements
+}
+
+/** Saves a code clip as a reusable element. Invalid code comes back as an error with its line. */
+export async function createElementMutationFn(input: SaveElementInput) {
+  const { data } = await api.post<ElementResponse>("/elements", input)
+  return data.element
+}
+
+// ── Claude ──────────────────────────────────────────────────────────────
+
+/** When the user's Claude Code last reached the MCP endpoint (null = never). */
+export async function getClaudeStatusQueryFn() {
+  const { data } = await api.get<ClaudeStatusResponse>("/claude/status")
+  return data.lastSeenAt
+}
+
 // ── Auth (Better Auth client) ───────────────────────────────────────────
 
 type BetterAuthResult<T> = { data: T; error: null } | { data: null; error: { message?: string } }
@@ -111,4 +140,35 @@ export async function signOutMutationFn() {
 
 export async function getSessionQueryFn() {
   return unwrap(await authClient.getSession(), "Couldn't load your session.")
+}
+
+/**
+ * Creates an API key for Claude Code. `expiresInDays` null = never expires.
+ * The full key is in the result only this once; the server keeps a hash.
+ */
+export async function createApiKeyMutationFn({ name, expiresInDays }: { name: string; expiresInDays: number | null }) {
+  const result = await authClient.apiKey.create({ name, expiresIn: expiresInDays ? expiresInDays * 24 * 60 * 60 : null })
+  return unwrap(result as BetterAuthResult<{ key: string; id: string; expiresAt: Date | string | null }>, "Couldn't create the key.")
+}
+
+const iso = (value: Date | string | null) => (value ? new Date(value).toISOString() : null)
+
+/** The user's API keys, newest first. */
+export async function listApiKeysQueryFn(): Promise<ApiKeySummary[]> {
+  const data = unwrap(await authClient.apiKey.list(), "Couldn't load your keys.")
+  return (data?.apiKeys ?? [])
+    .map((key) => ({
+      id: key.id,
+      name: key.name,
+      start: key.start,
+      createdAt: iso(key.createdAt)!,
+      lastUsedAt: iso(key.lastRequest),
+      expiresAt: iso(key.expiresAt),
+    }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+/** Revokes a key: Claude Code using it gets 401 from then on. */
+export async function revokeApiKeyMutationFn(keyId: string) {
+  return unwrap(await authClient.apiKey.delete({ keyId }), "Couldn't revoke the key.")
 }

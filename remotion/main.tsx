@@ -1,6 +1,20 @@
 import { Audio, Video } from "@remotion/media"
-import { AbsoluteFill, CanvasImage, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion"
+import { useEffect, useRef, useState } from "react"
+import {
+  AbsoluteFill,
+  CanvasImage,
+  continueRender,
+  delayRender,
+  getRemotionEnvironment,
+  interpolate,
+  Sequence,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion"
 
+import { fontStack, loadFont } from "@/lib/fonts"
+import { CodeClipView } from "@/remotion/code-clip"
+import { originalMediaUrl } from "@/lib/media-url"
 import type { AudioClip, Clip, Doc, TextClip } from "@/lib/project/schema"
 
 /*
@@ -12,9 +26,13 @@ import type { AudioClip, Clip, Doc, TextClip } from "@/lib/project/schema"
  * @remotion/media, <CanvasImage> for stills, CSS translate/scale/rotate for transforms.
  */
 
-export type MainProps = { doc: Doc }
+export type MainProps = {
+  doc: Doc
+  /** The editor sets this: a file that won't play only warns. Export leaves it off, so a broken file fails the render. */
+  preview?: boolean
+}
 
-export function Main({ doc }: MainProps) {
+export function Main({ doc, preview = false }: MainProps) {
   const { fps } = useVideoConfig()
   const trackIndex = new Map(doc.tracks.map((track, index) => [track.id, index]))
   // Track 0 is the top row: paint the bottom track first and track 0 last, so it lands on top.
@@ -28,24 +46,26 @@ export function Main({ doc }: MainProps) {
           otherwise the Player pauses to buffer. Premounting needs the default layout. */}
       {clips.map((clip) => (
         <Sequence key={clip.id} name={clip.name} from={clip.from} durationInFrames={clip.durationInFrames} premountFor={fps}>
-          <ClipView clip={clip} />
+          <ClipView clip={clip} preview={preview} />
         </Sequence>
       ))}
     </AbsoluteFill>
   )
 }
 
-function ClipView({ clip }: { clip: Clip }) {
+function ClipView({ clip, preview }: { clip: Clip; preview: boolean }) {
   switch (clip.type) {
     case "video":
       return (
         <Layer clip={clip}>
           <Video
-            src={clip.src}
+            // The original file, untouched: no ImageKit video processing, in the editor or the export.
+            src={originalMediaUrl(clip.src)}
             trimBefore={clip.trimStartFrames}
             volume={clip.volume}
             objectFit={clip.fit}
             style={{ width: "100%", height: "100%" }}
+            fallbackOffthreadVideoProps={preview ? { onError: warnMediaError(clip.name) } : undefined}
           />
         </Layer>
       )
@@ -62,7 +82,7 @@ function ClipView({ clip }: { clip: Clip }) {
         </Layer>
       )
     case "audio":
-      return <AudioView clip={clip} />
+      return <AudioView clip={clip} preview={preview} />
     case "text":
       return (
         <Layer clip={clip}>
@@ -70,10 +90,9 @@ function ClipView({ clip }: { clip: Clip }) {
         </Layer>
       )
     case "code":
-      // Code clips get their canvas runtime in Phase 6 of the plan.
       return (
         <Layer clip={clip} radius={clip.radius}>
-          <div style={{ width: "100%", height: "100%", border: "4px dashed rgba(79,196,176,0.7)" }} />
+          <CodeClipView clip={clip} />
         </Layer>
       )
   }
@@ -102,7 +121,7 @@ function Layer({ clip, radius, children }: { clip: Clip; radius?: number; childr
   )
 }
 
-function AudioView({ clip }: { clip: AudioClip }) {
+function AudioView({ clip, preview }: { clip: AudioClip; preview: boolean }) {
   // Inside the clip's <Sequence>, so frame 0 is the clip's first frame.
   const frame = useCurrentFrame()
   const { durationInFrames: length, fadeInFrames: fadeIn, fadeOutFrames: fadeOut } = clip
@@ -111,10 +130,18 @@ function AudioView({ clip }: { clip: AudioClip }) {
   const fadeOutLevel =
     fadeOut > 0 ? interpolate(frame, [length - fadeOut, length], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 1
 
-  return <Audio src={clip.src} trimBefore={clip.trimStartFrames} volume={clip.volume * fadeInLevel * fadeOutLevel} />
+  return (
+    <Audio
+      src={originalMediaUrl(clip.src)}
+      trimBefore={clip.trimStartFrames}
+      volume={clip.volume * fadeInLevel * fadeOutLevel}
+      fallbackHtml5AudioProps={preview ? { onError: warnMediaError(clip.name) } : undefined}
+    />
+  )
 }
 
 function TextView({ clip }: { clip: TextClip }) {
+  useFont(clip.fontFamily, clip.fontWeight)
   const justify = { left: "flex-start", center: "center", right: "flex-end" }[clip.align]
   return (
     <div
@@ -126,7 +153,7 @@ function TextView({ clip }: { clip: TextClip }) {
         justifyContent: justify,
         textAlign: clip.align,
         whiteSpace: "pre-wrap",
-        fontFamily: clip.fontFamily,
+        fontFamily: fontStack(clip.fontFamily),
         fontWeight: clip.fontWeight,
         fontSize: clip.fontSize,
         color: clip.color,
@@ -137,4 +164,30 @@ function TextView({ clip }: { clip: TextClip }) {
       {clip.text}
     </div>
   )
+}
+
+/**
+ * Loads a text clip's font. When rendering the export, the frame waits for it (delayRender) so
+ * no frame is captured in a fallback font; in the editor the text simply swaps in when it arrives.
+ */
+function useFont(family: string, weight: number) {
+  const [handle] = useState(() => (getRemotionEnvironment().isRendering ? delayRender(`Loading font ${family}`) : null))
+  const released = useRef(false)
+
+  useEffect(() => {
+    // Release the hold once, whichever load finishes (loadFont never rejects).
+    loadFont(family, weight).then(() => {
+      if (handle === null || released.current) return
+      released.current = true
+      continueRender(handle)
+    })
+  }, [family, weight, handle])
+}
+
+/**
+ * In the editor, a file that won't play (deleted from ImageKit, offline) shouldn't take the whole
+ * preview down: warn and carry on. Export doesn't pass this, so a broken file still fails the render.
+ */
+function warnMediaError(clipName: string) {
+  return (error: Error) => console.warn(`Couldn't play "${clipName}" in the preview.`, error.message)
 }

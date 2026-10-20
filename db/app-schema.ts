@@ -1,5 +1,7 @@
 import { bigint, doublePrecision, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 
+import type { ElementCategory, ElementLayout } from "@/lib/elements/types"
+import type { ParamDef } from "@/lib/project/schema"
 import type { MediaKind, ProjectDoc, ProjectFormat } from "@/types/project"
 
 import { user } from "./auth-schema"
@@ -61,3 +63,40 @@ export const media = pgTable(
   },
   (table) => [index("media_projectId_createdAt_idx").on(table.projectId, table.createdAt)]
 )
+
+/** "Mine" elements: code clips the user or Claude saved for reuse. Built-ins live in lib/elements/builtin. */
+export const element = pgTable(
+  "element",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    category: text("category").$type<ElementCategory>().notNull(),
+    /** Where the box goes when it's added (not in the plan's table; needed to place it like the built-ins). */
+    layout: text("layout").$type<ElementLayout>().notNull().default("callout"),
+    code: text("code").notNull(),
+    paramSchema: jsonb("param_schema").$type<ParamDef[]>().notNull(),
+    defaultParams: jsonb("default_params").$type<Record<string, unknown>>().notNull(),
+    fonts: jsonb("fonts").$type<string[]>().notNull(),
+    defaultDurationInFrames: integer("default_duration_in_frames").notNull(),
+    createdBy: text("created_by").$type<"user" | "claude">().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("element_userId_updatedAt_idx").on(table.userId, table.updatedAt)]
+)
+
+/** When Claude Code last reached the MCP endpoint for a user (updated on every MCP request). */
+export const claudeStatus = pgTable("claude_status", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  lastSeenAt: timestamp("last_seen_at").notNull(),
+})

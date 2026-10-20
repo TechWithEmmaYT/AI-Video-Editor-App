@@ -1,3 +1,4 @@
+import type { ElementDef } from "@/lib/elements/types"
 import type { Op } from "@/lib/project/ops"
 import type { Media, Project } from "@/types/project"
 
@@ -19,3 +20,18 @@ export type ImagekitAuthResponse = {
 }
 export type MediaListResponse = { media: Media[] }
 export type MediaResponse = { media: Media }
+export type ElementsResponse = { elements: ElementDef[] }
+export type ElementResponse = { element: ElementDef }
+
+/** ISO time Claude Code last reached /api/mcp, or null if it never has. */
+export type ClaudeStatusResponse = { lastSeenAt: string | null }
+
+/** An API key as the Settings list shows it (never the key itself, only its first characters). */
+export type ApiKeySummary = {
+  id: string
+  name: string | null
+  start: string | null
+  createdAt: string
+  lastUsedAt: string | null
+  expiresAt: string | null
+}

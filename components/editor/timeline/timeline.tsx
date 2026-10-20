@@ -15,10 +15,13 @@ import {
 } from "@/components/editor/timeline/timeline-context"
 import { TimelineToolbar } from "@/components/editor/timeline/timeline-toolbar"
 import { TrackRow } from "@/components/editor/timeline/track-row"
+import { hasElementDragData, readElementDragData } from "@/lib/element-drag"
+import { planElementAdd } from "@/lib/elements/place"
 import { hasMediaDragData } from "@/lib/media-drag"
 import { mediaDropOps, type DropTarget } from "@/lib/project/drop"
 import { clipEnd } from "@/lib/project/edit"
-import { sampleClipOps } from "@/lib/project/sample"
+import { planTextAdd } from "@/lib/project/text-presets"
+import { hasTextPresetDragData, readTextPresetDragData } from "@/lib/text-drag"
 import { useEditorStore } from "@/stores/editor-store"
 
 export function Timeline(props: { collapsed: boolean; onToggleCollapsed: () => void }) {
@@ -59,26 +62,37 @@ function TimelineInner({ collapsed, onToggleCollapsed }: { collapsed: boolean; o
     return trackId ? { kind: "track", trackId } : { kind: "new-track", index: doc.tracks.length }
   }
 
+  /** Media cards, Text presets and Elements can be dropped on the timeline. */
+  const isClipDrag = (event: React.DragEvent) =>
+    hasMediaDragData(event.dataTransfer) || hasTextPresetDragData(event.dataTransfer) || hasElementDragData(event.dataTransfer)
+
   function onDragOver(event: React.DragEvent) {
-    if (!hasMediaDragData(event.dataTransfer)) return
+    if (!isClipDrag(event)) return
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
     setDropHint({ frame: Math.max(0, snap(frameAt(event.clientX), { bypass: event.shiftKey })), target: dropTargetAt(event) })
   }
 
   function onDrop(event: React.DragEvent) {
-    if (!hasMediaDragData(event.dataTransfer)) return
+    if (!isClipDrag(event)) return
     event.preventDefault()
     setDropHint(null)
     clearSnapLine()
     const { data, width: compWidth, height: compHeight, dispatch } = useEditorStore.getState()
-    const result = mediaDropOps(data, event.dataTransfer, {
+    const options = {
       frame: Math.max(0, snap(frameAt(event.clientX), { bypass: event.shiftKey })),
       target: dropTargetAt(event),
       fps,
       width: compWidth,
       height: compHeight,
-    })
+    }
+    const presetId = readTextPresetDragData(event.dataTransfer)
+    const element = readElementDragData(event.dataTransfer)
+    const result = presetId
+      ? planTextAdd(data, presetId, options)
+      : element
+        ? planElementAdd(data, element, options)
+        : mediaDropOps(data, event.dataTransfer, options)
     if (result) dispatch(result.ops, { select: result.clipId })
   }
 
@@ -176,26 +190,9 @@ function GapRow({
         )}
         style={{ width, height: thin ? 3 : undefined, marginTop: thin ? TRACK_GAP / 2 : 0 }}
       >
-        {!thin && (empty ? "Drag media here from the Media tab to start" : "Drop here for a new track")}
-        {empty && process.env.NODE_ENV === "development" && <AddSampleClips />}
+        {!thin && (empty ? "Drag media, text or elements here to start" : "Drop here for a new track")}
       </div>
     </div>
-  )
-}
-
-/** Development only: fills an empty timeline with sample clips to compare against the design. Undo removes them. */
-function AddSampleClips() {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        const { data, fps, width, height, dispatch } = useEditorStore.getState()
-        dispatch(sampleClipOps(data, { fps, width, height, newId: () => crypto.randomUUID() }))
-      }}
-      className="ml-auto rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-    >
-      Add sample clips (dev)
-    </button>
   )
 }
 

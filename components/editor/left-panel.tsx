@@ -13,11 +13,16 @@ import {
 import { useState } from "react"
 
 import { CLIP_META } from "@/components/editor/clip-meta"
+import { MotionPanel } from "@/components/editor/inspector/motion-panel"
+import { StylePanel } from "@/components/editor/inspector/style-panel"
 import { PanelTabs, type PanelTab } from "@/components/editor/panel-tabs"
+import { ClaudePanel } from "@/components/editor/panels/claude-panel"
+import { ElementsPanel } from "@/components/editor/panels/elements-panel"
 import { MediaPanel } from "@/components/editor/panels/media-panel"
-import { PanelPlaceholder } from "@/components/editor/panels/panel-placeholder"
+import { TextPanel } from "@/components/editor/panels/text-panel"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { duplicateClipOps } from "@/lib/project/edit"
+import type { Clip } from "@/lib/project/schema"
 import { useEditorStore, useSelectedClip } from "@/stores/editor-store"
 
 type MainTab = "media" | "text" | "elements" | "claude"
@@ -25,40 +30,18 @@ type ClipTab = "style" | "motion"
 
 const MAIN_TABS: PanelTab<MainTab>[] = [
   { value: "media", label: "Media", icon: ImageIcon, content: <MediaPanel /> },
-  {
-    value: "text",
-    label: "Text",
-    icon: TypeIcon,
-    content: <PanelPlaceholder icon={TypeIcon} title="Text presets" text="Titles, captions and labels will live here." />,
-  },
-  {
-    value: "elements",
-    label: "Elements",
-    icon: ShapesIcon,
-    content: <PanelPlaceholder icon={ShapesIcon} title="Elements" text="Animated titles, lower thirds and more will live here." />,
-  },
-  {
-    value: "claude",
-    label: "Claude",
-    icon: BotIcon,
-    content: <PanelPlaceholder icon={BotIcon} title="Claude" text="Connection status and the connect command will live here." />,
-  },
+  { value: "text", label: "Text", icon: TypeIcon, content: <TextPanel /> },
+  { value: "elements", label: "Elements", icon: ShapesIcon, content: <ElementsPanel /> },
+  { value: "claude", label: "Claude", icon: BotIcon, content: <ClaudePanel /> },
 ]
 
-const CLIP_TABS: PanelTab<ClipTab>[] = [
-  {
-    value: "style",
-    label: "Style",
-    icon: SlidersHorizontalIcon,
-    content: <PanelPlaceholder icon={SlidersHorizontalIcon} title="Style" text="Per-clip style controls will live here." />,
-  },
-  {
-    value: "motion",
-    label: "Motion",
-    icon: MoveIcon,
-    content: <PanelPlaceholder icon={MoveIcon} title="Motion" text="Position, scale, rotation and opacity will live here." />,
-  },
-]
+function clipTabs(clip: Clip): PanelTab<ClipTab>[] {
+  // Keyed by clip, so switching clips starts each field fresh.
+  return [
+    { value: "style", label: "Style", icon: SlidersHorizontalIcon, content: <StylePanel key={clip.id} clip={clip} /> },
+    { value: "motion", label: "Motion", icon: MoveIcon, content: <MotionPanel key={clip.id} clip={clip} /> },
+  ]
+}
 
 /** Media | Text | Elements | Claude, or Style | Motion while a clip is selected. */
 export function LeftPanel() {
@@ -71,7 +54,7 @@ export function LeftPanel() {
       {clip ? (
         <>
           <ClipHeader />
-          <PanelTabs key="clip" tabs={CLIP_TABS} value={clipTab} onValueChange={setClipTab} />
+          <PanelTabs key="clip" tabs={clipTabs(clip)} value={clipTab} onValueChange={setClipTab} />
         </>
       ) : (
         <PanelTabs key="main" tabs={MAIN_TABS} value={mainTab} onValueChange={setMainTab} />

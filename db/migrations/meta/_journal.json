@@ -22,6 +22,20 @@
       "when": 1792259626151,
       "tag": "0002_media",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792486290624,
+      "tag": "0003_element",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792489746319,
+      "tag": "0004_claude_status",
+      "breakpoints": true
     }
   ]
 }

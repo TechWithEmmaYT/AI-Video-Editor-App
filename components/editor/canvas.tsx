@@ -32,7 +32,8 @@ export function Canvas() {
   const scale = zoom === "fit" ? fitScale : zoom
 
   const playerRef = usePlayerSync()
-  const inputProps = useMemo<MainProps>(() => ({ doc }), [doc])
+  // preview: a file that won't play only warns here instead of breaking the whole preview.
+  const inputProps = useMemo<MainProps>(() => ({ doc, preview: true }), [doc])
 
   function step(direction: 1 | -1) {
     const current = scale

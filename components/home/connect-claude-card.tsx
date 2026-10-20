@@ -2,7 +2,7 @@ import Link from "next/link"
 
 import { CopyButton } from "@/components/copy-button"
 import { APP_NAME } from "@/lib/brand"
-import { mcpAddCommand } from "@/lib/claude"
+import { mcpAddCommand } from "@/lib/agent/connect"
 
 export function ConnectClaudeCard() {
   const command = mcpAddCommand()

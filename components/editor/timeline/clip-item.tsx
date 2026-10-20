@@ -5,6 +5,7 @@ import { cn } from "cn"
 
 import { CLIP_META } from "@/components/editor/clip-meta"
 import { laneAt, laneOffset, useTimeline } from "@/components/editor/timeline/timeline-context"
+import { videoThumbnailUrl } from "@/lib/media-url"
 import { clipEnd, splitClipOps } from "@/lib/project/edit"
 import type { Op } from "@/lib/project/ops"
 import { isRangeFree } from "@/lib/project/placement"
@@ -155,8 +156,14 @@ export function ClipItem({ clip, pxPerFrame }: { clip: Clip; pxPerFrame: number 
         backgroundRepeat: "repeat-x, no-repeat",
       }}
     >
+      {clip.type === "video" && <Filmstrip src={clip.src} />}
       {handles && <TrimHandle side="start" onPointerDown={(event) => begin("trim-start", event)} />}
-      <div className={cn("flex min-w-0 flex-1 items-center gap-1.5 px-1.5", width <= 70 && "justify-center")}>
+      <div
+        className={cn(
+          "relative flex min-w-0 flex-1 items-center gap-1.5 px-1.5 [text-shadow:0_1px_2px_rgb(0_0_0/0.4)]",
+          width <= 70 && "justify-center"
+        )}
+      >
         {width > 24 && <meta.icon className="size-3.5 shrink-0 opacity-90" strokeWidth={2.5} />}
         {width > 70 && <span className="truncate text-[13px] font-semibold">{clip.name}</span>}
       </div>
@@ -171,12 +178,34 @@ function TrimHandle({ side, onPointerDown }: { side: "start" | "end"; onPointerD
       aria-hidden
       onPointerDown={onPointerDown}
       className={cn(
-        "flex h-full w-4 shrink-0 cursor-ew-resize items-center justify-center gap-0.75 transition-colors hover:bg-white/15",
+        "relative flex h-full w-4 shrink-0 cursor-ew-resize items-center justify-center gap-0.75 transition-colors hover:bg-white/15",
         side === "start" ? "rounded-l-xl" : "rounded-r-xl"
       )}
     >
       <span className="h-5 w-0.75 rounded-full bg-white/85" />
       <span className="h-5 w-0.75 rounded-full bg-white/85" />
+    </div>
+  )
+}
+
+/**
+ * The video's poster frame from ImageKit, repeated along the clip. It's the same URL the media card
+ * uses, so it's made once and cached: zooming and trimming never ask ImageKit for new frames.
+ * While it's still being generated, the clip colour shows instead.
+ */
+function Filmstrip({ src }: { src: string }) {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0"
+      style={{
+        backgroundImage: `url("${videoThumbnailUrl(src)}")`,
+        backgroundSize: "auto 100%",
+        backgroundRepeat: "repeat-x",
+      }}
+    >
+      {/* Keeps the name readable over the frames. */}
+      <div className="absolute inset-0 bg-linear-to-r from-black/45 via-black/15 to-black/30" />
     </div>
   )
 }

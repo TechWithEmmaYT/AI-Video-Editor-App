@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { createMediaMutationFn, getImagekitAuthQueryFn, queryKeys } from "@/lib/api"
+import { videoThumbnailUrl } from "@/lib/media-url"
 import { useMediaUploadStore, type PendingUpload } from "@/stores/media-upload-store"
 import type { Media, MediaKind } from "@/types/project"
 
@@ -48,15 +49,16 @@ export function useMediaUpload(projectId: string) {
   const allPending = useMediaUploadStore((state) => state.pending)
   const pending = allPending.filter((item) => item.projectId === projectId)
 
-  async function uploadFile(file: File) {
+  /** Resolves to the saved media once it's uploaded, or null if it was rejected, failed or cancelled. */
+  async function uploadFile(file: File): Promise<Media | null> {
     const kind = kindOf(file)
     if (!kind) {
       toast.error(`${file.name} isn't a video, image or audio file.`)
-      return
+      return null
     }
     if (file.size > MAX_BYTES[kind]) {
       toast.error(`${file.name} is too big`, { description: `${kind} files can be up to ${MAX_BYTES[kind] / 1024 / 1024} MB.` })
-      return
+      return null
     }
 
     const { start, setProgress, finish } = useMediaUploadStore.getState()
@@ -67,7 +69,7 @@ export function useMediaUpload(projectId: string) {
     try {
       // Fresh credentials for every upload (each token works once); read the file's size and length meanwhile.
       const [auth, local] = await Promise.all([getImagekitAuthQueryFn(), readMetadata(previewUrl, kind)])
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted) return null
 
       const result = await upload({
         file,
@@ -97,9 +99,12 @@ export function useMediaUpload(projectId: string) {
         durationSec: positiveOrNull(result.duration ?? local.durationSec),
       })
       queryClient.setQueryData<Media[]>(queryKeys.media(projectId), (list) => [media, ...(list ?? [])])
+      return media
     } catch (error) {
-      if (error instanceof ImageKitAbortError) return // cancelled
-      toast.error(`Couldn't upload ${file.name}`, { description: describe(error) })
+      if (!(error instanceof ImageKitAbortError)) {
+        toast.error(`Couldn't upload ${file.name}`, { description: describe(error) })
+      }
+      return null // failed or cancelled
     } finally {
       URL.revokeObjectURL(previewUrl)
       finish(id)
@@ -111,12 +116,12 @@ export function useMediaUpload(projectId: string) {
   }
 
   return { pending, uploadFile, cancel }
-}
+} 
 
-/** Images use ImageKit's thumbnail; videos get a poster frame from ImageKit; audio has none. */
+/** Images use ImageKit's thumbnail; videos get a poster frame from ImageKit; audio has none. */ 
 function thumbnailFor(kind: MediaKind, result: UploadResponse) {
   if (kind === "image") return result.thumbnailUrl ?? result.url ?? null
-  if (kind === "video") return `${result.url}/ik-thumbnail.jpg`
+  if (kind === "video" && result.url) return videoThumbnailUrl(result.url) // same URL the timeline clip uses
   return null
 }
 

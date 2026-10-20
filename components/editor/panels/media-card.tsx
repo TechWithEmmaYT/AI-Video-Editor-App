@@ -1,7 +1,7 @@
 "use client"
 
-import { Image } from "@imagekit/next"
 import { ImageIcon, MusicIcon, VideoIcon, XIcon } from "lucide-react"
+import { useState } from "react"
 
 import type { PendingUpload } from "@/components/editor/panels/use-media-upload"
 import {
@@ -11,7 +11,6 @@ import {
   CircularProgressTrack,
   CircularProgressValueText,
 } from "@/components/ui/circular-progress"
-import { envConfig } from "@/lib/env"
 import { setMediaDragData } from "@/lib/media-drag"
 import type { Media, MediaKind } from "@/types/project"
 
@@ -20,6 +19,7 @@ const KIND_ICON = { video: VideoIcon, image: ImageIcon, audio: MusicIcon } satis
 /** An uploaded file. Drag it onto the timeline to add it as a clip. */
 export function MediaCard({ media }: { media: Media }) {
   const Icon = KIND_ICON[media.kind]
+  const [thumbnailFailed, setThumbnailFailed] = useState(false)
 
   return (
     <div
@@ -29,18 +29,25 @@ export function MediaCard({ media }: { media: Media }) {
       className="group flex cursor-grab flex-col gap-1.5 active:cursor-grabbing"
     >
       <div className="relative aspect-video overflow-hidden rounded-xl bg-muted ring-(--editor-accent) transition-shadow group-hover:ring-2">
-        {media.thumbnailUrl ? (
-          <Image
-            urlEndpoint={envConfig.imagekit.urlEndpoint}
+        {/* No thumbnail (audio), or it failed: ImageKit answers 202 while a new video's poster is still generating. */}
+        {media.thumbnailUrl && !thumbnailFailed ? (
+          // Plain <img> at the exact saved URL: one thumbnail per file, made once by ImageKit and cached.
+          // (A responsive image would ask for several widths, and each new video thumbnail costs units.)
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={media.thumbnailUrl}
             alt=""
-            fill
-            sizes="160px"
+            loading="lazy"
+            decoding="async"
             draggable={false}
-            className="object-cover"
+            onError={() => setThumbnailFailed(true)}
+            className="absolute inset-0 size-full object-cover"
           />
         ) : (
-          <div className="grid h-full place-items-center bg-(--clip-audio)/15 text-(--clip-audio)">
+          <div
+            className="grid h-full place-items-center"
+            style={{ background: `color-mix(in oklab, var(--clip-${media.kind}) 15%, transparent)`, color: `var(--clip-${media.kind})` }}
+          >
             <Icon className="size-6" />
           </div>
         )}

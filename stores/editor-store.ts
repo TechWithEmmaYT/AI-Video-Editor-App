@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { create } from "zustand"
 
 import { applyOpsMutationFn } from "@/lib/api"
+import { FORMATS } from "@/lib/project/formats"
 import { applyWithInverse, OpError, withDurationFit, withEmptyTrackCleanup, type Op, type ProjectData } from "@/lib/project/ops"
 import { docSchema } from "@/lib/project/schema"
 import type { ProjectFormat, ProjectWithDoc } from "@/types/project"
@@ -48,8 +49,20 @@ type EditorState = {
   saveStatus: SaveStatus
 
   init: (project: ProjectWithDoc) => void
-  /** Applies a batch as one undoable step. Returns false (and changes nothing) if it's invalid. */
+  /** Applies a batch as one undoable step. Returns false (and changes nothing) if it's invalid. Ends any preview first. */
   dispatch: (ops: Op[], options?: { select?: string | null }) => boolean
+  /** The data from before a live preview started; null when none is running. */
+  previewBase: ProjectData | null
+  /**
+   * Shows ops on screen without saving or adding to history: scrubbing a number, typing text,
+   * dragging a colour. Each call replaces the last preview. Finish with dispatch (commit) or cancelPreview.
+   */
+  preview: (ops: Op[]) => void
+  /** The ops on screen in the running preview. */
+  previewOps: Op[] | null
+  cancelPreview: () => void
+  /** Saves the running preview as it stands (e.g. the inspector closed mid-edit). */
+  commitPreview: () => void
   undo: () => void
   redo: () => void
   select: (clipId: string | null) => void
@@ -74,6 +87,12 @@ let saveChain: Promise<unknown> = Promise.resolve()
 let pendingSaves = 0
 
 const HISTORY_LIMIT = 200
+
+/** The project data plus the canvas size it implies (format, width and height always follow data.format). */
+function withData(data: ProjectData) {
+  const { width, height } = FORMATS[data.format]
+  return { data, format: data.format, width, height }
+}
 
 export const useEditorStore = create<EditorState>((set, get) => {
   function save(ops: Op[]) {
@@ -115,7 +134,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     width: 1920,
     height: 1080,
     fps: 30,
-    data: { name: "", durationInFrames: 1, doc: { tracks: [], clips: [], sections: [] } },
+    data: { name: "", durationInFrames: 1, format: "16:9", doc: { tracks: [], clips: [], sections: [] } },
     selectedClipId: null,
     frame: 0,
     playing: false,
@@ -127,15 +146,15 @@ export const useEditorStore = create<EditorState>((set, get) => {
     past: [],
     future: [],
     saveStatus: "saved",
+    previewBase: null,
+    previewOps: null,
 
     init: (project) =>
       set({
         projectId: project.id,
-        format: project.format,
-        width: project.width,
-        height: project.height,
+
         fps: project.fps,
-        data: { name: project.name, durationInFrames: project.durationInFrames, doc: project.doc },
+        ...withData({ name: project.name, durationInFrames: project.durationInFrames, format: project.format, doc: project.doc }),
         selectedClipId: null,
         frame: 0,
         playing: false,
@@ -144,9 +163,14 @@ export const useEditorStore = create<EditorState>((set, get) => {
         past: [],
         future: [],
         saveStatus: "saved",
+        previewBase: null,
+        previewOps: null,
       }),
 
     dispatch: (rawOps, options) => {
+      // A commit after a preview: apply to the data from before the preview, so history and the
+      // saved ops describe the whole change in one step.
+      get().cancelPreview()
       const { data, past, selectedClipId } = get()
       let ops: Op[]
       try {
@@ -161,7 +185,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
       const selected = options?.select !== undefined ? options.select : selectedClipId
       set({
-        data: result.state,
+        ...withData(result.state),
         past: [...past, { ops, inverse: result.inverse }].slice(-HISTORY_LIMIT),
         future: [],
         selectedClipId: keepSelection(result.state, selected),
@@ -170,7 +194,24 @@ export const useEditorStore = create<EditorState>((set, get) => {
       return true
     },
 
+    preview: (ops) => {
+      const base = get().previewBase ?? get().data
+      const result = tryApply(base, ops)
+      if (result) set({ previewBase: base, previewOps: ops, ...withData(result.state) })
+    },
+
+    cancelPreview: () => {
+      const base = get().previewBase
+      if (base) set({ ...withData(base), previewBase: null, previewOps: null })
+    },
+
+    commitPreview: () => {
+      const ops = get().previewOps
+      if (ops) get().dispatch(ops)
+    },
+
     undo: () => {
+      get().cancelPreview()
       const { past, future, data, selectedClipId } = get()
       const entry = past.at(-1)
       if (!entry) return
@@ -178,7 +219,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
       // An entry that no longer applies (e.g. its clip is gone) is dropped rather than retried forever.
       if (!result) return set({ past: past.slice(0, -1) })
       set({
-        data: result.state,
+        ...withData(result.state),
         past: past.slice(0, -1),
         future: [...future, entry],
         selectedClipId: keepSelection(result.state, selectedClipId),
@@ -187,13 +228,14 @@ export const useEditorStore = create<EditorState>((set, get) => {
     },
 
     redo: () => {
+      get().cancelPreview()
       const { past, future, data, selectedClipId } = get()
       const entry = future.at(-1)
       if (!entry) return
       const result = tryApply(data, entry.ops)
       if (!result) return set({ future: future.slice(0, -1) })
       set({
-        data: result.state,
+        ...withData(result.state),
         past: [...past, entry],
         future: future.slice(0, -1),
         selectedClipId: keepSelection(result.state, selectedClipId),
