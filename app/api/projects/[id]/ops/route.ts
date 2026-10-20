@@ -20,7 +20,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/project
   if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? "Invalid ops.", 400)
 
   const { id } = await ctx.params
-  const result = await applyProjectOps(session.user.id, id, parsed.data.ops)
+  const result = await applyProjectOps(session.user.id, id, parsed.data.ops, {
+    clientId: parsed.data.clientId ?? "editor",
+    source: "editor",
+  })
 
   switch (result.status) {
     case "ok":

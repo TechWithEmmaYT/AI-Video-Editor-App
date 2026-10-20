@@ -4,7 +4,7 @@ import { create } from "zustand"
 
 import { applyOpsMutationFn } from "@/lib/api"
 import { FORMATS } from "@/lib/project/formats"
-import { applyWithInverse, OpError, withDurationFit, withEmptyTrackCleanup, type Op, type ProjectData } from "@/lib/project/ops"
+import { applyOps, applyWithInverse, OpError, withDurationFit, withEmptyTrackCleanup, type Op, type ProjectData } from "@/lib/project/ops"
 import { docSchema } from "@/lib/project/schema"
 import type { ProjectFormat, ProjectWithDoc } from "@/types/project"
 
@@ -47,6 +47,8 @@ type EditorState = {
   past: HistoryEntry[]
   future: HistoryEntry[]
   saveStatus: SaveStatus
+  /** The project version this tab has (from the live stream; see use-project-events). */
+  version: number
 
   init: (project: ProjectWithDoc) => void
   /** Applies a batch as one undoable step. Returns false (and changes nothing) if it's invalid. Ends any preview first. */
@@ -63,6 +65,12 @@ type EditorState = {
   cancelPreview: () => void
   /** Saves the running preview as it stands (e.g. the inspector closed mid-edit). */
   commitPreview: () => void
+
+  /** Ops someone else saved (Claude, another tab): applied without history or saving. False if they don't apply. */
+  applyRemote: (ops: Op[], version: number) => boolean
+  setVersion: (version: number) => void
+  /** Replaces the doc with the server's (this tab fell behind), keeping the view and selection. */
+  reloadDoc: (project: ProjectWithDoc) => void
   undo: () => void
   redo: () => void
   select: (clipId: string | null) => void
@@ -80,7 +88,8 @@ type EditorState = {
   setPxPerSecond: (px: number) => void
 }
 
-const clientId = typeof crypto !== "undefined" ? crypto.randomUUID() : "server"
+/** This tab: sent with every save so the live stream's echo of our own ops can be skipped. */
+export const clientId = typeof crypto !== "undefined" ? crypto.randomUUID() : "server"
 
 // Saves run one after another so the server applies ops in the order they happened.
 let saveChain: Promise<unknown> = Promise.resolve()
@@ -146,6 +155,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     past: [],
     future: [],
     saveStatus: "saved",
+    version: 0,
     previewBase: null,
     previewOps: null,
 
@@ -163,6 +173,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         past: [],
         future: [],
         saveStatus: "saved",
+        version: project.version,
         previewBase: null,
         previewOps: null,
       }),
@@ -203,6 +214,34 @@ export const useEditorStore = create<EditorState>((set, get) => {
     cancelPreview: () => {
       const base = get().previewBase
       if (base) set({ ...withData(base), previewBase: null, previewOps: null })
+    },
+
+    applyRemote: (ops, version) => {
+      get().cancelPreview()
+      const { data, selectedClipId } = get()
+      try {
+        const next = applyOps(data, ops)
+        if (!docSchema.safeParse(next.doc).success) return false
+        set({ ...withData(next), version, selectedClipId: keepSelection(next, selectedClipId) })
+        return true
+      } catch {
+        return false
+      }
+    },
+
+    setVersion: (version) => set({ version }),
+
+    reloadDoc: (project) => {
+      get().cancelPreview()
+      const data = { name: project.name, durationInFrames: project.durationInFrames, format: project.format, doc: project.doc }
+      set({
+        ...withData(data),
+        version: project.version,
+        selectedClipId: keepSelection(data, get().selectedClipId),
+        // Undo steps were computed against the old doc.
+        past: [],
+        future: [],
+      })
     },
 
     commitPreview: () => {

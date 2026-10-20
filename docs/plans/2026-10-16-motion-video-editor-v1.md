@@ -110,6 +110,7 @@ remotion/
 trigger/render-video.ts
 scripts/bundle-remotion.ts
 stores/editor-store.ts
+tests/                                 # every test, mirroring the code paths; fixtures.ts
 components/
   ui/ (shadcn + animate-ui tabs; never hand-edit, they get regenerated)
   brand/ pill-button.tsx logo.tsx filled-input.tsx   # design-specific variants live here, not in ui/
@@ -405,10 +406,23 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
 - **Done:** auth, home/new-project, project doc schema + ops reducer (`lib/project/schema.ts`, `ops.ts`), `POST /api/projects/[id]/ops` (version-checked save), editor store (`stores/editor-store.ts`), editor shell, canvas (Player, zoom/fit), timeline (ruler/scrub, playhead, sections, tracks, move/trim/split, snapping with Shift to bypass, undo/redo, shortcuts, resizable height), media drop.
 - **Media tab:** UI only (react-dropzone zone + empty state). ImageKit upload, `/api/imagekit/auth`, `/api/projects/[id]/media` and the media cards are built by hand, outside this plan's automation. `media` table migration `0002_media.sql` is generated, not yet applied.
 - **Not yet:** live updates (SSE), MCP tools + `editor_state`, Settings account card, export.
+- **2026-10-25 — MCP tools + live updates:**
+  - **Live updates:** `lib/realtime/bus.ts` is the in-memory bus (globalThis, 200-event replay; the Redis bus is still to do for production). `applyProjectOps` publishes every saved batch (with origin) and Claude's `add_media_from_url` publishes `media` events. `GET /api/projects/[id]/events` is the SSE route (hello with the version, 15 s ping, closes at ~290 s). `use-project-events` applies remote ops, skips its own echo, and reloads via `GET /api/projects/[id]/doc` on a gap or failure.
+  - **"this":** the `editor_state` table (migration `0007_editor_state.sql`), `POST /api/editor-state` (editor reports project + selection, debounced 300 ms), and `lib/agent/resolve.ts`.
+  - **Tools** (`lib/agent/tools/`): get_guide, list_projects, get_selection, get_project, list_media, get_media (contact sheet/image as an image), get_media_transcript, add_media_from_url (ImageKit fetches the URL), add_clip (media/text/element/code; seconds; track auto/new-top/new-bottom/id), update_clip, delete_clip. The server sends `instructions` (start with get_guide; look at videos first).
+  - **Guide:** `lib/agent/guide.ts` is generated from code (elements, helpers, fonts, formats, validator lists, briefs, registered tools) plus hand-written workflow/assets/recipes.
+  - **Errors:** every tool failure reaches Claude as a tool error (AgentError messages; unexpected failures logged and reported without internals).
+  - **More tools (later the same day):** split_clip, add/update/delete_section, create_project, update_project (name, format with refit, seconds), list_elements, get_element, save_element (validated; createdBy claude), add_element, validate_code, get_code_clip_guide. That makes 23 tools, all tested end to end against a live editor.
+  - **Bus:** `lib/realtime/` has `types.ts` (the EventBus interface), `memory-bus.ts` (local) and `redis-bus.ts` (REDIS_URL: XADD capped stream + PUBLISH, one shared subscriber per instance; not yet run against a real Redis). A failed publish is logged and never fails a save.
+  - **Tests:** `tests/server-only.ts` stubs Next's `server-only` so server modules can be unit-tested.
+  - **Still to do:** export tools (need the export phase), plus the `claude` status event on the user channel (status still polls).
 - **2026-10-24 (later):**
   - **Shortcuts:** they run in the capture phase; sliders only claim arrow/Home/End keys, so Delete/Backspace always reach the selected clip.
   - **Clip menu:** right-click a clip for Split at playhead / Duplicate / Delete (`clip-context-menu.tsx`).
-  - **Still to do:** long-form brief (shared caption/b-roll rules defined once), Clear timeline button, playhead knob kept in the sticky ruler when scrolling, `<||>` cursor on the playhead body.
+  - **Briefs:** `talking-head.ts` holds the shared rules (tracks, transcript timing, captions, b-roll at volume 0, card on black, checks). `reel-captions.ts` (9:16) and `long-form.ts` (16:9: 3–7 word captions in the bottom band, b-roll every 8–15 s, chapters → sections, name lower third, chapter title cards) only set their numbers.
+  - **Clear timeline:** a toolbar button (next to split) with a confirm popover. `clearTimelineOps` makes it one undoable batch; `opsSchema` now allows up to 2000 ops per save.
+  - **Playhead:** the knob lives in the sticky ruler, so it stays visible when the tracks scroll vertically. The line has a drag strip; the ruler, knob and line use the col-resize cursor.
+  - **Tests:** all tests live in `tests/`, mirroring the code (`tests/lib/project/ops.test.ts` → `lib/project/ops.ts`); shared fixtures are in `tests/fixtures.ts`.
 - **2026-10-24 — reel style (briefs):**
   - **Video radius:** video clips have `radius` (default 0; Style → Corner radius), for b-roll in a rounded card.
   - **Italic fonts:** `FontDef.italics`, `loadFont(family, weight, style)`, and `M.font(family, weight, size, "italic")`. 10 curated fonts have italics, including Playfair Display.

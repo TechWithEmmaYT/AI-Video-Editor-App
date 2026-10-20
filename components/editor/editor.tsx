@@ -8,6 +8,8 @@ import { LeftPanel } from "@/components/editor/left-panel"
 import { Timeline } from "@/components/editor/timeline/timeline"
 import { TopBar } from "@/components/editor/top-bar"
 import { useEditorShortcuts } from "@/components/editor/use-editor-shortcuts"
+import { useProjectEvents } from "@/components/editor/use-project-events"
+import { saveEditorStateMutationFn } from "@/lib/api"
 import { useEditorStore } from "@/stores/editor-store"
 import type { ProjectWithDoc } from "@/types/project"
 
@@ -26,6 +28,8 @@ export function Editor({ project }: { project: ProjectWithDoc }) {
   })
   useEditorShortcuts()
   useWarnBeforeLeavingUnsaved()
+  useReportEditorState(project.id)
+  useProjectEvents(project.id)
   const timeline = useResizableTimeline()
 
   return (
@@ -60,6 +64,22 @@ export function Editor({ project }: { project: ProjectWithDoc }) {
       </section>
     </div>
   )
+}
+
+/**
+ * Tells the server what's open (on load, and 300 ms after the selection settles), so Claude can
+ * resolve "this" to this project and the selected clip.
+ */
+function useReportEditorState(projectId: string) {
+  const selectedClipId = useEditorStore((state) => state.selectedClipId)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveEditorStateMutationFn({ projectId, selectedClipId }).catch(() => {
+        // Only affects what Claude takes "this" to mean; the next selection change tries again.
+      })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [projectId, selectedClipId])
 }
 
 /** Edits save in the background; ask before closing the tab while one is still on its way. */

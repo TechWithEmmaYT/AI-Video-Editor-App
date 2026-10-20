@@ -44,7 +44,8 @@ export const opSchema = z.discriminatedUnion("type", [
   }),
 ])
 
-export const opsSchema = z.array(opSchema).min(1).max(200)
+// Up to 2000 per save: clearing (or undoing a clear of) a big timeline is one batch.
+export const opsSchema = z.array(opSchema).min(1).max(2000)
 
 export type Op = z.infer<typeof opSchema>
 

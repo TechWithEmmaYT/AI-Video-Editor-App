@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { BRIEFS } from "@/lib/agent/briefs"
+import { BRIEFS, findBrief } from "@/lib/agent/briefs"
 import { findBuiltinElement } from "@/lib/elements/builtin"
 import { findFont } from "@/lib/fonts"
 
@@ -20,5 +20,22 @@ describe("briefs", () => {
     const defaults = Object.fromEntries(caption.paramSchema.map((p) => [p.key, p.default]))
     expect(defaults).toMatchObject({ font: "Inter", weight: 900, emphasisFont: "Playfair Display", emphasisColor: "#ff3b30", emphasisItalic: true })
     expect(caption.layout).toBe("caption")
+  })
+})
+
+describe("talking-head briefs", () => {
+  it("share the same rules and differ only in their numbers", () => {
+    const reel = findBrief("reel-captions")!
+    const long = findBrief("long-form")!
+    for (const brief of [reel, long]) {
+      expect(brief.body).toContain("volume: 0")
+      expect(brief.body).toContain("clip.from + round(sourceSeconds × fps) − clip.trimStartFrames")
+      expect(brief.body).toContain("Solid Colour")
+    }
+    expect(reel.body).toContain("1–4 words")
+    expect(long.body).toContain("3–7 words")
+    expect(long.body).toContain("Bar Lower Third")
+    expect(reel.formats).toEqual(["9:16"])
+    expect(long.formats).toEqual(["16:9"])
   })
 })

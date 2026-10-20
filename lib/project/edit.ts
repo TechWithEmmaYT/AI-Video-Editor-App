@@ -113,3 +113,14 @@ export function changeFormatOps(state: ProjectData, format: ProjectFormat): Op[]
   }
   return ops
 }
+
+/** Removes every clip, section and track, as one undoable batch. Null when there's nothing to clear. */
+export function clearTimelineOps(state: ProjectData): Op[] | null {
+  const { clips, sections, tracks } = state.doc
+  if (clips.length === 0 && sections.length === 0 && tracks.length === 0) return null
+  return [
+    ...clips.map((clip): Op => ({ type: "removeClip", clipId: clip.id })),
+    ...sections.map((section): Op => ({ type: "removeSection", sectionId: section.id })),
+    ...tracks.map((track): Op => ({ type: "removeTrack", trackId: track.id })),
+  ]
+}

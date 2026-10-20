@@ -16,6 +16,7 @@ import type {
   ImagekitAuthResponse,
   MediaListResponse,
   MediaResponse,
+  ProjectDocResponse,
   ProjectResponse,
   ProjectsResponse,
   TranscriptResponse,
@@ -64,6 +65,12 @@ export async function getProjectsQueryFn() {
 
 export async function getProjectQueryFn(id: string) {
   const { data } = await api.get<ProjectResponse>(`/projects/${id}`)
+  return data.project
+}
+
+/** The project with its doc and version (the editor reloads this when it falls behind). */
+export async function getProjectDocQueryFn(id: string) {
+  const { data } = await api.get<ProjectDocResponse>(`/projects/${id}/doc`)
   return data.project
 }
 
@@ -129,6 +136,11 @@ export async function createElementMutationFn(input: SaveElementInput) {
 }
 
 // ── Claude ──────────────────────────────────────────────────────────────
+
+/** Tells the server what's open in the editor, so Claude can resolve "this". */
+export async function saveEditorStateMutationFn(input: { projectId: string; selectedClipId: string | null }) {
+  await api.post("/editor-state", input)
+}
 
 /** When the user's Claude Code last reached the MCP endpoint (null = never). */
 export async function getClaudeStatusQueryFn() {

@@ -5,7 +5,7 @@ import { FORMATS } from "@/lib/project/formats"
 import { applyOps } from "@/lib/project/ops"
 import { docSchema, type AudioClip } from "@/lib/project/schema"
 import { planTextAdd, TEXT_PRESETS } from "@/lib/project/text-presets"
-import { idSequence, imageClip, project } from "@/lib/project/test-fixtures"
+import { idSequence, imageClip, project } from "@/tests/fixtures"
 
 const size = { fps: 30, width: 1920, height: 1080 }
 

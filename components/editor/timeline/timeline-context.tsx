@@ -13,7 +13,7 @@ export const TRACK_GAP = 8
 /** Snap distance, in screen pixels. */
 const SNAP_PX = 8
 
-export const SECTION_COLORS = ["#8b5cf6", "#3b82f6", "#22c55e", "#14b8a6", "#f59e0b", "#ec4899", "#f97316"]
+export { SECTION_COLORS } from "@/lib/project/sections"
 
 /**
  * Shared geometry: the element whose left edge is frame 0 (it scrolls with the content),

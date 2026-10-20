@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { project } from "@/db/schema"
 import { changedCodeError } from "@/lib/code-clips/doc-check"
+import { projectChannel, publish } from "@/lib/realtime/bus"
 import { FORMATS, FPS } from "@/lib/project/formats"
 import { applyOps, OpError, type Op, type ProjectData } from "@/lib/project/ops"
 import { docSchema, EMPTY_DOC } from "@/lib/project/schema"
@@ -60,16 +61,26 @@ export async function getProjectWithDoc(userId: string, id: string): Promise<Pro
 }
 
 export type ApplyOpsResult =
-  | { status: "ok"; version: number }
+  | { status: "ok"; version: number; data: ProjectData; ops: Op[] }
   | { status: "not-found" }
   | { status: "invalid"; message: string }
   | { status: "conflict" }
 
+/** Who a batch of ops came from: an editor tab (its clientId) or Claude. */
+export type OpsOrigin = { clientId: string; source: "editor" | "claude" }
+
 /**
- * Applies ops with the shared reducer and saves the result. Uses the version column as an
- * optimistic lock (retrying a few times), so two quick writers can't lose each other's ops.
+ * Applies ops with the shared reducer, saves the result and publishes it to the project's live
+ * stream. Uses the version column as an optimistic lock (retrying a few times), so two quick
+ * writers can't lose each other's ops. `ops` can be a function of the latest state (Claude's tools
+ * build their ops from what's there); it's called again on each retry.
  */
-export async function applyProjectOps(userId: string, id: string, ops: Op[]): Promise<ApplyOpsResult> {
+export async function applyProjectOps(
+  userId: string,
+  id: string,
+  ops: Op[] | ((state: ProjectData) => Op[]),
+  origin: OpsOrigin
+): Promise<ApplyOpsResult> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const [row] = await db
       .select({
@@ -85,8 +96,12 @@ export async function applyProjectOps(userId: string, id: string, ops: Op[]): Pr
     if (!row) return { status: "not-found" }
 
     let next: ProjectData
+    let batch: Op[]
     try {
-      next = applyOps({ name: row.name, durationInFrames: row.durationInFrames, format: row.format, doc: row.doc }, ops)
+      const state: ProjectData = { name: row.name, durationInFrames: row.durationInFrames, format: row.format, doc: row.doc }
+      batch = typeof ops === "function" ? ops(state) : ops
+      if (batch.length === 0) return { status: "ok", version: row.version, data: state, ops: [] }
+      next = applyOps(state, batch)
     } catch (error) {
       if (error instanceof OpError) return { status: "invalid", message: error.message }
       throw error
@@ -110,7 +125,11 @@ export async function applyProjectOps(userId: string, id: string, ops: Op[]): Pr
       })
       .where(and(eq(project.id, id), eq(project.userId, userId), eq(project.version, row.version)))
       .returning({ version: project.version })
-    if (saved.length) return { status: "ok", version: saved[0].version }
+    if (saved.length) {
+      const version = saved[0].version
+      await publish(projectChannel(id), { type: "ops", ops: batch, version, clientId: origin.clientId, source: origin.source })
+      return { status: "ok", version, data: { ...next, doc: checked.data }, ops: batch }
+    }
   }
   return { status: "conflict" }
 }

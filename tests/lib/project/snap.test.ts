@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { snapFrame, snapPoints, snapRange } from "@/lib/project/snap"
-import { imageClip, project } from "@/lib/project/test-fixtures"
+import { imageClip, project } from "@/tests/fixtures"
 
 describe("snapping", () => {
   const state = project(

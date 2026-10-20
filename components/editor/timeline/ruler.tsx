@@ -62,7 +62,7 @@ export function Ruler({ width }: { width: number }) {
       <div className="sticky left-0 z-10 shrink-0 bg-card" style={{ width: HEADER_W }} />
       <div
         ref={originRef}
-        className="relative cursor-text touch-none overflow-hidden border-b border-border select-none"
+        className="relative cursor-col-resize touch-none overflow-hidden border-b border-border select-none"
         style={{
           width,
           backgroundImage: `repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px ${minor}px)`,
@@ -86,69 +86,99 @@ export function Ruler({ width }: { width: number }) {
           </span>
         ))}
       </div>
+      {/* In the ruler (pinned to the top), so it stays in view when the tracks scroll vertically. */}
+      <PlayheadKnob />
+    </div>
+  )
+}
+
+/** Keeps an element at the playhead's x (via the DOM, so playback doesn't re-render React every frame). */
+function usePlayheadPosition(ref: React.RefObject<HTMLElement | null>, onPlace?: (x: number) => void) {
+  const onPlaceRef = useRef(onPlace)
+  useEffect(() => {
+    onPlaceRef.current = onPlace
+  })
+  useEffect(() => {
+    function place() {
+      const { frame, pxPerSecond, fps } = useEditorStore.getState()
+      const x = HEADER_W + (frame * pxPerSecond) / fps
+      if (ref.current) ref.current.style.left = `${x}px`
+      onPlaceRef.current?.(x)
+    }
+    place()
+    return useEditorStore.subscribe(place)
+  }, [ref])
+}
+
+/** The playhead's handle in the ruler: drag (snaps; Shift to skip) or focus it and use ←/→. */
+function PlayheadKnob() {
+  const knobRef = useRef<HTMLDivElement>(null)
+  const scrub = useScrub()
+  usePlayheadPosition(knobRef, () => {
+    const knob = knobRef.current
+    if (!knob) return
+    const { frame, fps, data } = useEditorStore.getState()
+    knob.setAttribute("aria-valuenow", String(frame))
+    knob.setAttribute("aria-valuetext", formatTimecode(frame, fps))
+    knob.setAttribute("aria-valuemax", String(data.durationInFrames - 1))
+  })
+
+  return (
+    <div
+      ref={knobRef}
+      role="slider"
+      tabIndex={0}
+      aria-label="Playhead"
+      aria-valuemin={0}
+      // Kept current by usePlayheadPosition; this is the value at render time.
+      aria-valuenow={useEditorStore.getState().frame}
+      className="absolute z-40 grid h-6 w-4 -translate-x-1/2 cursor-ew-resize touch-none place-items-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-(--editor-accent)/50"
+      style={{ top: RULER_H - 26 }}
+      onPointerDown={(event) => scrub.onPointerDown(event, { snapOnPress: true })}
+      onPointerMove={scrub.onPointerMove}
+      onPointerUp={scrub.onPointerUp}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+        event.preventDefault()
+        const { frame, fps, seek } = useEditorStore.getState()
+        const step = event.shiftKey ? fps : 1
+        seek(frame + (event.key === "ArrowRight" ? step : -step))
+      }}
+    >
+      <span className="h-5 w-3 rounded-full border-2 border-card bg-(--editor-accent) shadow" />
     </div>
   )
 }
 
 /**
- * The playhead: a line over every row with a knob in the ruler. It's positioned through the
- * DOM from a store subscription, so playback doesn't re-render React on every frame.
- * While playing it recentres the view when it runs off screen.
+ * The playhead line over every track. Drag it (the `<||>` cursor) to scrub, like the knob in the
+ * ruler. While playing it recentres the view when it runs off screen.
  */
 export function Playhead({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement | null> }) {
   const lineRef = useRef<HTMLDivElement>(null)
-  const knobRef = useRef<HTMLDivElement>(null)
   const scrub = useScrub()
-
-  useEffect(() => {
-    function place() {
-      const { frame, pxPerSecond, fps, playing, data } = useEditorStore.getState()
-      const x = HEADER_W + (frame * pxPerSecond) / fps
-      if (lineRef.current) lineRef.current.style.left = `${x}px`
-      if (knobRef.current) {
-        knobRef.current.setAttribute("aria-valuenow", String(frame))
-        knobRef.current.setAttribute("aria-valuetext", formatTimecode(frame, fps))
-        knobRef.current.setAttribute("aria-valuemax", String(data.durationInFrames - 1))
-      }
-
-      const scroller = scrollRef.current
-      if (!playing || !scroller) return
-      const visibleLeft = scroller.scrollLeft + HEADER_W
-      const visibleRight = scroller.scrollLeft + scroller.clientWidth
-      if (x < visibleLeft || x > visibleRight - 24) {
-        scroller.scrollLeft = Math.max(0, x - HEADER_W - (scroller.clientWidth - HEADER_W) / 2)
-      }
+  usePlayheadPosition(lineRef, (x) => {
+    const { playing } = useEditorStore.getState()
+    const scroller = scrollRef.current
+    if (!playing || !scroller) return
+    const visibleLeft = scroller.scrollLeft + HEADER_W
+    const visibleRight = scroller.scrollLeft + scroller.clientWidth
+    if (x < visibleLeft || x > visibleRight - 24) {
+      scroller.scrollLeft = Math.max(0, x - HEADER_W - (scroller.clientWidth - HEADER_W) / 2)
     }
-    place()
-    return useEditorStore.subscribe(place)
-  }, [scrollRef])
+  })
 
   return (
     <div ref={lineRef} className="pointer-events-none absolute top-0 bottom-0 z-40 w-0">
       <div className="absolute top-0 bottom-0 -left-px w-0.5 bg-(--editor-accent)" />
+      {/* A slightly wider, invisible strip so the line is easy to grab. */}
       <div
-        ref={knobRef}
-        role="slider"
-        tabIndex={0}
-        aria-label="Playhead"
-        aria-valuemin={0}
-        // Kept current by the subscription above; this is the value at render time.
-        aria-valuenow={useEditorStore.getState().frame}
-        className="pointer-events-auto absolute -left-2 grid h-6 w-4 cursor-ew-resize touch-none place-items-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-(--editor-accent)/50"
-        style={{ top: RULER_H - 26 }}
-        onPointerDown={(event) => scrub.onPointerDown(event, { snapOnPress: true })}
+        aria-hidden
+        className="pointer-events-auto absolute top-0 bottom-0 -left-1 w-2 cursor-col-resize touch-none"
+        onPointerDown={(event) => scrub.onPointerDown(event, { snapOnPress: false })}
         onPointerMove={scrub.onPointerMove}
         onPointerUp={scrub.onPointerUp}
-        onKeyDown={(event) => {
-          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
-          event.preventDefault()
-          const { frame, fps, seek } = useEditorStore.getState()
-          const step = event.shiftKey ? fps : 1
-          seek(frame + (event.key === "ArrowRight" ? step : -step))
-        }}
-      >
-        <span className="h-5 w-3 rounded-full border-2 border-card bg-(--editor-accent) shadow" />
-      </div>
+      />
     </div>
   )
 }

@@ -9,14 +9,18 @@ import {
   Redo2Icon,
   ScissorsIcon,
   SkipBackIcon,
+  Trash2Icon,
   SkipForwardIcon,
   Undo2Icon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "lucide-react"
+import { useState } from "react"
 import { cn } from "cn"
 
+import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from "@/components/ui/popover"
 import { Slider } from "@/components/ui/slider"
+import { clearTimelineOps } from "@/lib/project/edit"
 import { formatTimecode } from "@/lib/project/timecode"
 import { MAX_PX_PER_SECOND, MIN_PX_PER_SECOND, useEditorStore } from "@/stores/editor-store"
 
@@ -37,6 +41,8 @@ export function TimelineToolbar({ collapsed, onToggleCollapsed }: { collapsed: b
         <ToolButton label="Split (C)" active={tool === "split"} onClick={() => setTool("split")}>
           <ScissorsIcon className="size-[18px]" />
         </ToolButton>
+        <span className="mx-1 h-6 w-px bg-border" />
+        <ClearTimelineButton />
       </div>
 
       <Transport />
@@ -160,5 +166,48 @@ function IconButton({
     >
       {children}
     </button>
+  )
+}
+
+/** Removes every clip, section and track, after a confirm. One undoable step. */
+function ClearTimelineButton() {
+  const clipCount = useEditorStore((state) => state.data.doc.clips.length)
+  const sectionCount = useEditorStore((state) => state.data.doc.sections.length)
+  const [open, setOpen] = useState(false)
+  const empty = clipCount === 0 && sectionCount === 0
+
+  function clear() {
+    const { data, dispatch, select } = useEditorStore.getState()
+    const ops = clearTimelineOps(data)
+    if (ops && dispatch(ops)) select(null)
+    setOpen(false)
+  }
+
+  const parts = [clipCount > 0 && `${clipCount} clip${clipCount === 1 ? "" : "s"}`, sectionCount > 0 && `${sectionCount} section${sectionCount === 1 ? "" : "s"}`]
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        disabled={empty}
+        aria-label="Clear timeline"
+        title="Clear timeline"
+        className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+      >
+        <Trash2Icon className="size-[18px]" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 gap-3 rounded-2xl p-3.5">
+        <PopoverTitle className="text-sm font-semibold">Clear the timeline?</PopoverTitle>
+        <PopoverDescription className="text-[13px] leading-relaxed text-muted-foreground">
+          Removes {parts.filter(Boolean).join(" and ")}. Your uploads stay in the Media tab, and ⌘Z brings it all back.
+        </PopoverDescription>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={() => setOpen(false)} className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground">
+            Cancel
+          </button>
+          <button type="button" onClick={clear} className="h-8 rounded-full bg-destructive px-3.5 text-xs font-semibold text-white">
+            Clear timeline
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }

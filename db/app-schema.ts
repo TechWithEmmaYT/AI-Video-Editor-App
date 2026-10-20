@@ -105,3 +105,16 @@ export const claudeStatus = pgTable("claude_status", {
     .references(() => user.id, { onDelete: "cascade" }),
   lastSeenAt: timestamp("last_seen_at").notNull(),
 })
+
+/** What the user has open in the editor, so Claude can resolve "this" (see the plan, §8). */
+export const editorState = pgTable("editor_state", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  projectId: text("project_id").references(() => project.id, { onDelete: "set null" }),
+  selectedClipId: text("selected_clip_id"),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+})

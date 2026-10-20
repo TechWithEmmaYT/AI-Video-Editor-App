@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
 
 import { verifyAgentToken } from "@/lib/agent/auth"
+import { AGENT_INSTRUCTIONS } from "@/lib/agent/guide"
 import { registerAgentTools } from "@/lib/agent/tools"
 import { APP_NAME } from "@/lib/brand"
 
@@ -10,7 +11,11 @@ import { APP_NAME } from "@/lib/brand"
  * The tools are registered in lib/agent/tools.
  */
 
-const handler = createMcpHandler(registerAgentTools, { serverInfo: { name: APP_NAME, version: "0.1.0" } })
+const handler = createMcpHandler(registerAgentTools, {
+  serverInfo: { name: APP_NAME, version: "0.1.0" },
+  // Sent to Claude Code on connect: start with get_guide, look at videos before editing them.
+  instructions: AGENT_INSTRUCTIONS,
+})
 
 const authHandler = withMcpAuth(handler, verifyAgentToken, { required: true })
 

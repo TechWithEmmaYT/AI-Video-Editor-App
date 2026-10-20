@@ -4,7 +4,7 @@ import { hasMediaDragData, MEDIA_DRAG_TYPE, readMediaDragData, setMediaDragData 
 import { mediaDropOps, planMediaDrop, type DropOptions } from "@/lib/project/drop"
 import { applyOps } from "@/lib/project/ops"
 import { docSchema, type Clip } from "@/lib/project/schema"
-import { idSequence, imageClip, project } from "@/lib/project/test-fixtures"
+import { idSequence, imageClip, project } from "@/tests/fixtures"
 import type { Media } from "@/types/project"
 
 /** Just enough of the browser's DataTransfer for a drag between a card and the timeline. */

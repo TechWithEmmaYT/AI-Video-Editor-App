@@ -1,12 +1,13 @@
 import type { ElementDef } from "@/lib/elements/types"
 import type { Op } from "@/lib/project/ops"
-import type { Media, Project } from "@/types/project"
+import type { Media, Project, ProjectWithDoc } from "@/types/project"
 
 /** Error body returned by every route in app/api (except Better Auth's own). */
 export type ApiError = { error: string }
 
 export type ProjectsResponse = { projects: Project[] }
 export type ProjectResponse = { project: Project }
+export type ProjectDocResponse = { project: ProjectWithDoc }
 
 export type ApplyOpsRequest = { ops: Op[]; clientId?: string }
 export type ApplyOpsResponse = { version: number }

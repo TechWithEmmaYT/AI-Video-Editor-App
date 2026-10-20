@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 
-import { changeFormatOps, duplicateClipOps, replaceSourceOps, splitClipOps } from "@/lib/project/edit"
-import { applyOps, applyWithInverse } from "@/lib/project/ops"
+import { changeFormatOps, clearTimelineOps, duplicateClipOps, replaceSourceOps, splitClipOps } from "@/lib/project/edit"
+import { applyOps, applyWithInverse, withEmptyTrackCleanup } from "@/lib/project/ops"
 import { docSchema, type AudioClip } from "@/lib/project/schema"
-import { idSequence, imageClip, project } from "@/lib/project/test-fixtures"
+import { idSequence, imageClip, project } from "@/tests/fixtures"
 
 const audio: AudioClip = {
   id: "a1",
@@ -127,5 +127,22 @@ describe("changeFormatOps", () => {
 
   it("is null for the same format", () => {
     expect(changeFormatOps(project(), "16:9")).toBeNull()
+  })
+})
+
+describe("clearTimelineOps", () => {
+  it("removes everything in one batch that undoes exactly", () => {
+    const state = project({
+      tracks: [{ id: "t1" }, { id: "t2" }],
+      clips: [imageClip({ id: "a", trackId: "t1" }), imageClip({ id: "b", trackId: "t2", from: 60 })],
+      sections: [{ id: "s1", name: "Intro", from: 0, to: 30, color: "#8b5cf6" }],
+    })
+    const { state: cleared, inverse } = applyWithInverse(state, withEmptyTrackCleanup(state, clearTimelineOps(state)!))
+    expect(cleared.doc).toEqual({ tracks: [], clips: [], sections: [] })
+    expect(applyOps(cleared, inverse)).toEqual(state)
+  })
+
+  it("is null on an empty timeline", () => {
+    expect(clearTimelineOps(project())).toBeNull()
   })
 })

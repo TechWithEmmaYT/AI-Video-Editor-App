@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { applyOps, applyWithInverse, OpError, opsSchema, withDurationFit, withEmptyTrackCleanup, type Op } from "@/lib/project/ops"
 import { docSchema } from "@/lib/project/schema"
-import { imageClip, project } from "@/lib/project/test-fixtures"
+import { imageClip, project } from "@/tests/fixtures"
 
 const base = project({
   tracks: [{ id: "t1" }, { id: "t2" }],

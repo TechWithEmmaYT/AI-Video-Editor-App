@@ -10,7 +10,7 @@ import { findFont } from "@/lib/fonts"
 import { FORMATS } from "@/lib/project/formats"
 import { applyOps } from "@/lib/project/ops"
 import { docSchema } from "@/lib/project/schema"
-import { idSequence, project } from "@/lib/project/test-fixtures"
+import { idSequence, project } from "@/tests/fixtures"
 
 /** A stand-in 2D context: records nothing, but answers what drawing code reads. */
 function fakeContext() {
