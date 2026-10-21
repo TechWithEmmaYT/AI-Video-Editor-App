@@ -411,6 +411,13 @@ The wrapper (`remotion/clips/CodeClip.tsx`) works like this:
 - **Done:** auth, home/new-project, project doc schema + ops reducer (`lib/project/schema.ts`, `ops.ts`), `POST /api/projects/[id]/ops` (version-checked save), editor store (`stores/editor-store.ts`), editor shell, canvas (Player, zoom/fit), timeline (ruler/scrub, playhead, sections, tracks, move/trim/split, snapping with Shift to bypass, undo/redo, shortcuts, resizable height), media drop.
 - **Media tab:** UI only (react-dropzone zone + empty state). ImageKit upload, `/api/imagekit/auth`, `/api/projects/[id]/media` and the media cards are built by hand, outside this plan's automation. `media` table migration `0002_media.sql` is generated, not yet applied.
 - **Not yet:** live updates (SSE), MCP tools + `editor_state`, Settings account card, export.
+- **2026-10-21 — Preview plays local copies of media:**
+  - **Problem:** after an agent split or cut a video over MCP, the editor preview played slowly and stuttered; the export was fine. Every cut is a seek, and the Player streamed the full ImageKit original (`?tr=orig-true`), so each seek buffered again over the network.
+  - **Fix:** the Player plays video and audio from a copy kept in the browser. `lib/local-media.ts` stores copies in IndexedDB (`motion-local-media`), keyed by media id, with a size and last-used entry per file. `stores/local-media-store.ts` maps each ImageKit URL (a clip's `src`) to a blob URL for the open project; `canvas.tsx` passes it to `<Main>` as `localSources`, and `playbackUrl` falls back to the ImageKit original for anything not there.
+  - **Where copies come from:** an upload keeps its `File` (plays straight away, and is saved for next time). Everything else (the agent's `add_media_from_url`, which arrives through the `media` event and the media query, or files uploaded elsewhere) is downloaded once in the background, one at a time, by `useLocalMedia` in the editor, and plays from ImageKit until it's ready.
+  - **Limits:** copies past 2 GB go least recently used first; copies the open project is playing are never evicted. If IndexedDB is missing or refuses the space (quota), the preview streams from ImageKit as before. Blob URLs are freed when the editor closes.
+  - **Unchanged:** the saved doc and the export (Trigger.dev render) still use the ImageKit originals; `localSources` is only set by the editor.
+  - **Tests:** `tests/lib/local-media.test.ts` (eviction order). Not yet measured in a browser.
 - **2026-10-20 — Preview performance + export confirm/cancel:**
   - Measured with CPU profiles of a copy of the 43-clip reel, playing from the browser cache. On the production build, playback went from 0.51–0.59× real time to 0.98× in two of three runs (0.70× in the third).
   - Fixes:
