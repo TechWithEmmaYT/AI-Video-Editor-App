@@ -28,7 +28,7 @@ export type ElementsResponse = { elements: ElementDef[] }
 export type ElementResponse = { element: ElementDef }
 
 /** ISO time Claude Code last reached /api/mcp, or null if it never has. */
-export type ClaudeStatusResponse = { lastSeenAt: string | null }
+export type ClaudeStatusResponse = { lastSeenAt: string | null; keyId: string | null }
 
 /** An API key as the Settings list shows it (never the key itself, only its first characters). */
 export type ApiKeySummary = {

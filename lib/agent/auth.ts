@@ -18,6 +18,6 @@ export async function verifyAgentToken(_request: Request, bearerToken?: string):
 
   const userId = key.referenceId
   // Only drives the status dot: never fail Claude's request over it.
-  await markClaudeSeen(userId).catch((error) => console.error("Couldn't record Claude status", error))
+  await markClaudeSeen(userId, key.id).catch((error) => console.error("Couldn't record Claude status", error))
   return { token: bearerToken, clientId: key.id, scopes: [], extra: { userId } }
 }
