@@ -11,6 +11,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
+import { keepUploadedCopy } from "@/components/editor/use-local-media"
 import { createMediaMutationFn, getImagekitAuthQueryFn, queryKeys } from "@/lib/api"
 import { makeContactSheet } from "@/lib/contact-sheet"
 import { videoThumbnailUrl } from "@/lib/media-url"
@@ -103,6 +104,7 @@ export function useMediaUpload(projectId: string) {
         durationSec: positiveOrNull(result.duration ?? local.durationSec),
         contactSheetUrl,
       })
+      keepUploadedCopy(projectId, media, file)
       queryClient.setQueryData<Media[]>(queryKeys.media(projectId), (list) => [media, ...(list ?? [])])
       return media
     } catch (error) {

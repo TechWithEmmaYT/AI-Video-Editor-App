@@ -8,6 +8,7 @@ import { cn } from "cn"
 import { clipEnd } from "@/lib/project/edit"
 import { Main, type MainProps } from "@/remotion/main"
 import { useEditorStore, useSelectedClip } from "@/stores/editor-store"
+import { useLocalMediaStore } from "@/stores/local-media-store"
 
 /**
  * The composition, memoized for the Player: the Player re-renders its child on every frame, and
@@ -27,6 +28,7 @@ export function Canvas() {
   const height = useEditorStore((state) => state.height)
   const fps = useEditorStore((state) => state.fps)
   const select = useEditorStore((state) => state.select)
+  const localSources = useLocalMediaStore((state) => state.sources)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const available = useElementSize(containerRef)
@@ -39,7 +41,7 @@ export function Canvas() {
 
   const playerRef = usePlayerSync()
   // preview: a file that won't play only warns here instead of breaking the whole preview.
-  const inputProps = useMemo<MainProps>(() => ({ doc, preview: true }), [doc])
+  const inputProps = useMemo<MainProps>(() => ({ doc, preview: true, localSources }), [doc, localSources])
 
   function step(direction: 1 | -1) {
     const current = scale
