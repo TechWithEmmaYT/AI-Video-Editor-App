@@ -150,7 +150,9 @@ Find files yourself with web search/fetch or a browser; no API keys or extra too
 - **B-roll video & photos:** Pexels (free, no attribution needed), Pixabay (free; hotlinking isn't allowed, so always bring files in). Prefer **≤ 720p** video (smaller, faster).
 - **Sound effects & music:** Pixabay sound effects / music.
 - **Logos:** https://api.svgl.app (SVG; JSON list with file URLs). Add with \`add_media_from_url\`, or draw inline with \`M.svg(markup)\` in a code clip. Use a brand's logo only to show that brand.
-- **Avatars (placeholders):** https://i.pravatar.cc/256`
+- **Avatars (placeholders):** https://i.pravatar.cc/256
+- **References & Inspiration edits: Search reels, longform on Pinterest for more: https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed, changing the 'q=' words to what you need, e.g. "reel captions" or "talking head reel edit".',
+`
 
 const recipes = () => `# Recipes
 
