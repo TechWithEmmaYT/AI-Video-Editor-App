@@ -1,5 +1,5 @@
 import type { ProjectData } from "@/lib/project/ops"
-import type { Clip, Doc, ImageClip } from "@/lib/project/schema"
+import { CLIP_MOTION_DEFAULTS, type Clip, type Doc, type ImageClip } from "@/lib/project/schema"
 
 // Shared builders for unit tests.
 
@@ -9,6 +9,7 @@ export function project(doc: Partial<Doc> = {}, durationInFrames = 450): Project
 
 export function imageClip(overrides: Partial<ImageClip> & Pick<Clip, "id" | "trackId">): ImageClip {
   return {
+  ...CLIP_MOTION_DEFAULTS,
     type: "image",
     name: "Still",
     color: "blue",

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import type { Clip, VideoClip } from "@/lib/project/schema"
+import { CLIP_MOTION_DEFAULTS, type Clip, type VideoClip } from "@/lib/project/schema"
 import { clipAt, groupVideoRuns } from "@/lib/project/video-runs"
 import { imageClip } from "@/tests/fixtures"
 
 const video = (id: string, from: number, duration: number, trim: number, overrides: Partial<VideoClip> = {}): VideoClip => ({
+  ...CLIP_MOTION_DEFAULTS,
   id,
   trackId: "t1",
   type: "video",

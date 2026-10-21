@@ -147,7 +147,7 @@ function VideoRunView({ clips, preview, localSources }: { clips: VideoClip[] } &
   const frame = useCurrentFrame()
   const active = clipAt(clips, frame)
   return (
-    <Layer clip={active} radius={active.radius}>
+    <Layer clip={active} radius={active.radius} animate={false}>
       <Video
         src={playbackUrl(clips[0].src, localSources)}
         trimBefore={clips[0].trimStartFrames}
@@ -160,9 +160,14 @@ function VideoRunView({ clips, preview, localSources }: { clips: VideoClip[] } &
   )
 }
 
-/** Positions a clip's box from its transform. The content inside only fills the box. */
-function Layer({ clip, radius, children }: { clip: Clip; radius?: number; children: React.ReactNode }) {
+/**
+ * Positions a clip's box from its transform, and folds in its entrance and exit. The content
+ * inside only fills the box. `animate` is off for video runs, where the frame is relative to the
+ * run rather than to the clip, so an entrance would fire at the wrong moment.
+ */
+function Layer({ clip, radius, animate = true, children }: { clip: Clip; radius?: number; animate?: boolean; children: React.ReactNode }) {
   const { x, y, width, height, scale, rotation, opacity } = clip.transform
+  const motion = useClipMotion(clip, animate)
   return (
     <div
       style={{
@@ -171,9 +176,12 @@ function Layer({ clip, radius, children }: { clip: Clip; radius?: number; childr
         top: y,
         width,
         height,
-        opacity,
-        scale,
+        opacity: opacity * motion.opacity,
+        scale: scale * motion.scale,
         rotate: `${rotation}deg`,
+        translate: motion.translateY ? `0 ${motion.translateY * height}px` : undefined,
+        filter: motion.blur ? `blur(${motion.blur}px)` : undefined,
+        clipPath: motion.reveal < 1 ? `inset(${(1 - motion.reveal) * 100}% 0 0 0)` : undefined,
         borderRadius: radius || undefined,
         overflow: radius ? "hidden" : undefined,
       }}
@@ -182,6 +190,48 @@ function Layer({ clip, radius, children }: { clip: Clip; radius?: number; childr
     </div>
   )
 }
+
+const NO_MOTION = { opacity: 1, scale: 1, translateY: 0, blur: 0, reveal: 1 }
+
+/** One motion preset at progress `k` (0 = fully out, 1 = fully in). `away` flips the direction. */
+function motionAt(preset: Clip["animateIn"], k: number, away: boolean) {
+  const eased = 1 - (1 - k) ** 3
+  switch (preset) {
+    case "pop": {
+      // Overshoots slightly on the way in, like the caption words.
+      const back = 1 + 2.7 * (k - 1) ** 3 + 1.7 * (k - 1) ** 2
+      return { ...NO_MOTION, opacity: Math.min(1, k * 2), scale: 0.72 + 0.28 * back }
+    }
+    case "rise":
+      return { ...NO_MOTION, opacity: k, translateY: (1 - eased) * (away ? -0.12 : 0.12) }
+    case "scale":
+      return { ...NO_MOTION, opacity: k, scale: 0.6 + 0.4 * eased }
+    case "grow":
+      return { ...NO_MOTION, opacity: Math.min(1, k * 4), scale: eased }
+    case "wipe":
+      return { ...NO_MOTION, reveal: eased }
+    case "blur":
+      return { ...NO_MOTION, opacity: k, blur: (1 - eased) * 14 }
+    default:
+      return NO_MOTION
+  }
+}
+
+/** The clip's entrance and exit at the current frame, combined. */
+function useClipMotion(clip: Clip, animate: boolean) {
+  const frame = useCurrentFrame()
+  if (!animate) return NO_MOTION
+
+  const { animateIn, animateInFrames, animateOut, animateOutFrames, durationInFrames } = clip
+  const entering = animateIn !== "none" && animateInFrames > 0 && frame < animateInFrames
+  const leaving = animateOut !== "none" && animateOutFrames > 0 && frame > durationInFrames - animateOutFrames
+
+  if (entering) return motionAt(animateIn, clamp01(frame / animateInFrames), false)
+  if (leaving) return motionAt(animateOut, clamp01((durationInFrames - frame) / animateOutFrames), true)
+  return NO_MOTION
+}
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
 
 function AudioView({ clip, preview, localSources }: { clip: AudioClip } & MediaViewProps) {
   // Inside the clip's <Sequence>, so frame 0 is the clip's first frame.

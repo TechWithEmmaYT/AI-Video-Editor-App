@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import { changeFormatOps, clearTimelineOps, duplicateClipOps, replaceSourceOps, splitClipOps } from "@/lib/project/edit"
 import { applyOps, applyWithInverse, withEmptyTrackCleanup } from "@/lib/project/ops"
-import { docSchema, type AudioClip } from "@/lib/project/schema"
+import { CLIP_MOTION_DEFAULTS, docSchema, type AudioClip } from "@/lib/project/schema"
 import { idSequence, imageClip, project } from "@/tests/fixtures"
 
 const audio: AudioClip = {
+  ...CLIP_MOTION_DEFAULTS,
   id: "a1",
   trackId: "t1",
   type: "audio",
@@ -114,6 +115,7 @@ describe("changeFormatOps", () => {
 
   it("shrinks a box (and its text) that's wider than the new canvas", () => {
     const text = {
+      ...CLIP_MOTION_DEFAULTS,
       id: "t", trackId: "t1", type: "text" as const, name: "Title", from: 0, durationInFrames: 30,
       transform: { x: 154, y: 400, width: 1612, height: 280, scale: 1, rotation: 0, opacity: 1 },
       text: "Hi", fontFamily: "Inter", fontWeight: 800, fontSize: 120, color: "#fff", align: "center" as const, letterSpacing: -2, lineHeight: 1,

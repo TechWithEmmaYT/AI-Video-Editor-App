@@ -1,7 +1,7 @@
 import { chooseVisualTrack, type DropTarget } from "@/lib/project/drop"
 import { MAX_SECONDS } from "@/lib/project/formats"
 import type { Op, ProjectData } from "@/lib/project/ops"
-import type { TextClip, Transform } from "@/lib/project/schema"
+import { CLIP_MOTION_DEFAULTS, type TextClip, type Transform } from "@/lib/project/schema"
 
 /*
  * The Text tab's presets. Sizes are fractions of the canvas's short side, so a Title looks the
@@ -69,6 +69,7 @@ export function textClipFromPreset(
 ): TextClip {
   const fontSize = Math.round(Math.min(width, height) * preset.size)
   return {
+    ...CLIP_MOTION_DEFAULTS,
     id,
     trackId,
     type: "text",

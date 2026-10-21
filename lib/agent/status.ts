@@ -19,3 +19,8 @@ export async function getClaudeLastSeen(userId: string) {
   const [row] = await db.select({ lastSeenAt: claudeStatus.lastSeenAt }).from(claudeStatus).where(eq(claudeStatus.userId, userId)).limit(1)
   return row?.lastSeenAt ?? null
 }
+
+/** Forgets that Claude Code was ever seen, so the editor shows "Not connected" again. */
+export async function clearClaudeSeen(userId: string) {
+  await db.delete(claudeStatus).where(eq(claudeStatus.userId, userId))
+}

@@ -47,3 +47,43 @@ if (u < 0.5) {
   ctx.fill("evenodd")
 }`,
 }
+
+/**
+ * A colour floods the screen, then a rounded card grows out of the middle of it and takes over —
+ * the cut a talking head makes into a built graphic, instead of a hard cut.
+ */
+export const shapeGrow: ElementDef = {
+  id: "shape-grow",
+  name: "Shape Grow",
+  category: "transitions",
+  layout: "full",
+  defaultDurationInFrames: 24,
+  fonts: [],
+  paramSchema: [
+    { key: "color", label: "Flood colour", type: "color", default: "#7c3aed" },
+    { key: "shapeColor", label: "Card colour", type: "color", default: "#ffffff" },
+    { key: "radius", label: "Card corner radius", type: "number", default: 48, min: 0, max: 400, step: 4 },
+    { key: "hold", label: "Flood holds until", type: "number", default: 0.45, min: 0.1, max: 0.9, step: 0.05 },
+  ],
+  defaultParams: {},
+  createdBy: "builtin",
+  code: `// Up to \`hold\` the flood wipes across; after it, the card grows from a pill to the full frame.
+if (u < p.hold) {
+  const k = M.ease.outQuint(u / p.hold)
+  ctx.fillStyle = p.color
+  ctx.fillRect(0, h / 2 - (h / 2) * k, w, h * k)
+  return
+}
+
+ctx.fillStyle = p.color
+ctx.fillRect(0, 0, w, h)
+
+const k = M.ease.inOutCubic((u - p.hold) / (1 - p.hold))
+// Starts as a small pill in the middle and ends covering the frame.
+const cw = w * (0.22 + 0.78 * k)
+const ch = h * (0.07 + 0.93 * k)
+ctx.fillStyle = p.shapeColor
+ctx.beginPath()
+ctx.roundRect((w - cw) / 2, (h - ch) / 2, cw, ch, p.radius * (1 - k * 0.7))
+ctx.fill()`,
+}

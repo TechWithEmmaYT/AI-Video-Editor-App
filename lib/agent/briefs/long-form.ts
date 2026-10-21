@@ -16,12 +16,15 @@ export const longForm = talkingHeadBrief({
     placement:
       "move the box to the bottom band: x 10% of the width, width 80%, y ≈ 74% down, height 14% (above the player controls)",
     scale: 0.8,
+    mode: "replace",
+    look: '`font: "Inter"`, `weight: 700`, `color: "#ffffff"`, `emphasisColor: "#ffd166"`, `emphasisItalic: false`, `highlight: "none"`, `animation: "fade"`, `shadow: true`',
   },
   broll: {
     every: "8–15 s",
     length: "3–6 s",
     maxShare: "a third",
     card: "box ≈ 70% of the width, centred both ways, `radius: 32`",
+    kinds: ["stock", "graphic"],
   },
   hook: "for the first 5 s (the speaker introduces the video) and the last 5 s",
   safeZone: "5% margins on every side; captions above the bottom 10%",
