@@ -17,15 +17,26 @@ import { formatTimestamp } from "@/lib/transcript"
 /** How many captions one call will lay down, so a long file can't fill the timeline by accident. */
 const MAX_PHRASES = 240
 
+/** Each `look` and the caption element that draws it. The Modern looks come first. */
+const CAPTION_LOOKS = {
+  "lead-in": "lead-in-caption",
+  accent: "accent-caption",
+  "heavy-fill": "heavy-caption",
+  kinetic: "kinetic-caption",
+} as const
+
+type CaptionLook = keyof typeof CAPTION_LOOKS
+
 export function registerCaptionTools(server: McpServer) {
   server.registerTool(
     "add_captions",
     {
       title: "Caption a whole stretch of speech",
       description: [
-        "Lays a Kinetic Caption clip for every phrase in a media file's transcript, with each word's time filled in — the whole caption track in one call, instead of one add_clip per phrase.",
+        "Lays a caption clip for every phrase in a media file's transcript, with each word's time filled in — the whole caption track in one call, instead of one add_clip per phrase.",
         "Needs a transcript on the media file (get_media_transcript shows whether there is one).",
-        "`style` is the look: the same params as the Kinetic Caption element, set the same on every caption. get_guide({ topic: \"briefs\" }) gives the style for an edit.",
+        "`look` picks the caption element. The Modern looks, for Reels, TikTok and Shorts: \"lead-in\" (a small faint line of the lesser words over the key word, big on a red box), \"accent\" (white Poppins with the key word in purple and a line drawing on under it), \"heavy-fill\" (huge tight heavy type in a soft pink wash filling the width, the key word in solid red). Then \"kinetic\", the Kinetic Caption, which is the default.",
+        "`style` overrides that element's params, set the same on every caption. get_guide({ topic: \"briefs\" }) gives the style for an edit.",
         "Returns how many captions it added and the range they cover.",
       ].join(" "),
       inputSchema: z.object({
@@ -42,12 +53,16 @@ export function registerCaptionTools(server: McpServer) {
         linesPerPhrase: z.number().int().min(1).max(3).default(1).describe('Lines stacked in one caption clip (for mode "lines").'),
         pauseSeconds: z.number().min(0.05).max(2).default(0.45).describe("A gap this long or longer always ends a phrase."),
         emphasis: z.boolean().default(true).describe("Mark one word per phrase as the emphasis word."),
-        style: z.record(z.string(), z.unknown()).default({}).describe("Kinetic Caption params: font, weight, color, mode, highlight, animation…"),
+        look: z
+          .enum(["lead-in", "accent", "heavy-fill", "kinetic"])
+          .default("kinetic")
+          .describe('Modern: "lead-in", "accent", "heavy-fill". Classic: "kinetic" (the Kinetic Caption, the default).'),
+        style: z.record(z.string(), z.unknown()).default({}).describe("Caption params to override: font, weight, color, mode, highlight, animation…"),
         box: z
           .object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() })
           .partial()
           .optional()
-          .describe("Where the captions sit. Default: the element's caption box (top third)."),
+          .describe("Where the captions sit. Default: mid-screen, 24% of the height tall (30% for heavy-fill) for the Modern looks, the top third for kinetic."),
         track: z.union([z.enum(["auto", "new-top"]), z.string().min(1).max(64)]).default("new-top").describe("All the captions go on this one track."),
         projectId: z.string().min(1).max(64).optional().describe("Defaults to the project open in the editor."),
       }),
@@ -63,6 +78,7 @@ export function registerCaptionTools(server: McpServer) {
           linesPerPhrase: number
           pauseSeconds: number
           emphasis: boolean
+          look: CaptionLook
           style: Record<string, unknown>
           box?: { x?: number; y?: number; width?: number; height?: number }
           track: string
@@ -109,8 +125,21 @@ export function registerCaptionTools(server: McpServer) {
           )
         }
 
-        const element = findBuiltinElement("kinetic-caption")
-        if (!element) throw new AgentError("The Kinetic Caption element is missing.")
+        const element = findBuiltinElement(CAPTION_LOOKS[input.look])
+        if (!element) throw new AgentError(`The caption element for the "${input.look}" look is missing.`)
+
+        // The Modern looks sit mid-screen, and need the height for a big key word; heavy fill the most.
+        const tall = input.look === "heavy-fill" ? 0.3 : 0.24
+        const box =
+          input.box ??
+          (input.look === "kinetic"
+            ? undefined
+            : {
+                x: Math.round(project.width * 0.06),
+                y: Math.round(project.height * (0.48 - tall / 2)),
+                width: Math.round(project.width * 0.88),
+                height: Math.round(project.height * tall),
+              })
 
         // Source second → timeline second, through the clip that plays the file.
         const onTimeline = (sourceSeconds: number) => (speaker.from - trimStart) / project.fps + sourceSeconds
@@ -143,7 +172,7 @@ export function registerCaptionTools(server: McpServer) {
                 at,
                 duration,
                 params: { ...input.style, text: phrase.text, times: phrase.times },
-                box: input.box,
+                box,
                 // Every caption lands on the same track: the first makes it, the rest join it.
                 track,
                 animateIn: undefined,

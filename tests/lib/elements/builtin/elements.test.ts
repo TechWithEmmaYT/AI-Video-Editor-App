@@ -31,8 +31,8 @@ function fakeContext() {
 
 describe("built-in elements", () => {
   it("has every built-in, with unique ids", () => {
-    expect(BUILTIN_ELEMENTS).toHaveLength(21)
-    expect(new Set(BUILTIN_ELEMENTS.map((e) => e.id)).size).toBe(21)
+    expect(BUILTIN_ELEMENTS).toHaveLength(24)
+    expect(new Set(BUILTIN_ELEMENTS.map((e) => e.id)).size).toBe(24)
   })
 
   it.each(BUILTIN_ELEMENTS.map((e) => [e.name, e] as const))("%s passes the validator and draws without errors", (_, element) => {
