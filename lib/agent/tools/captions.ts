@@ -11,6 +11,7 @@ import { resolveProject } from "@/lib/agent/resolve"
 import { findBuiltinElement } from "@/lib/elements/builtin"
 import { getUserMedia } from "@/lib/media-transcript"
 import { MAX_SECONDS } from "@/lib/project/formats"
+import { applyOps, type Op } from "@/lib/project/ops"
 import { formatTimestamp } from "@/lib/transcript"
 
 /** How many captions one call will lay down, so a long file can't fill the timeline by accident. */
@@ -89,8 +90,10 @@ export function registerCaptionTools(server: McpServer) {
         if (!speaker) throw new AgentError(`No clip in this project plays "${media.name}" yet. Add it first, then caption it.`)
         const trimStart = "trimStartFrames" in speaker ? speaker.trimStartFrames : 0
 
-        const from = input.from ?? 0
-        const to = input.to ?? media.durationSec ?? MAX_SECONDS
+        // By default only what the clip plays: words cut away by its trim would land outside it.
+        const playedFrom = trimStart / project.fps
+        const from = input.from ?? playedFrom
+        const to = input.to ?? playedFrom + speaker.durationInFrames / project.fps
         const words = wordsIn(media.transcript, from, to)
         if (words.length === 0) throw new AgentError(`The transcript has nothing between ${formatTimestamp(from)} and ${formatTimestamp(to)}.`)
 
@@ -115,17 +118,25 @@ export function registerCaptionTools(server: McpServer) {
         let added = 0
         let track = input.track
         await applyAgentEdit(userId, project.id, (state) => {
-          const ops = []
+          added = 0
+          track = input.track
+          const ops: Op[] = []
+          // Each caption is placed against the project as the ones before it left it, so the
+          // track the first one makes exists for the rest.
+          let working = state
           for (const [index, phrase] of phrases.entries()) {
             const next = phrases[index + 1]
             // A caption holds until the next one starts, or a beat past its last word at a pause.
             const until = next ? Math.min(next.start, phrase.end + 0.3) : phrase.end + 0.3
             const at = onTimeline(phrase.start)
-            const duration = Math.max(0.6, until - phrase.start)
+            // At least 0.6 s on screen, but never into the next caption on the same track; the frame
+            // taken off keeps rounding to frames from making the two touch.
+            const room = next ? next.start - phrase.start - 1 / project.fps : Infinity
+            const duration = Math.min(room, Math.max(0.6, until - phrase.start))
             if (at + duration > MAX_SECONDS) break
 
             const result = addClipOps(
-              state,
+              working,
               {
                 kind: "element",
                 elementId: element.id,
@@ -143,18 +154,17 @@ export function registerCaptionTools(server: McpServer) {
               { width: project.width, height: project.height, newId: () => crypto.randomUUID(), element }
             )
             ops.push(...result.ops)
-            // Ops aren't applied until the whole batch is built, so take the track from the first one.
-            if (index === 0) {
-              const addTrack = result.ops.find((op) => op.type === "addTrack")
-              if (addTrack && "track" in addTrack) track = addTrack.track.id
-            }
+            working = applyOps(working, result.ops)
+            const addTrack = result.ops.find((op) => op.type === "addTrack")
+            if (addTrack && "track" in addTrack) track = addTrack.track.id
             added++
           }
           return ops
         })
 
+        if (added === 0) throw new AgentError(`Those captions would start past the ${MAX_SECONDS} s a project can run.`)
         const first = onTimeline(phrases[0].start)
-        const last = onTimeline(phrases[Math.min(added, phrases.length) - 1].end)
+        const last = onTimeline(phrases[added - 1].end)
         return text(
           `Added ${added} captions from ${formatTimestamp(first)} to ${formatTimestamp(last)}, ${input.maxWords} words at most each. Check them with get_project.`
         )
