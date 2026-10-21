@@ -105,6 +105,8 @@ export const claudeStatus = pgTable("claude_status", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   lastSeenAt: timestamp("last_seen_at").notNull(),
+  /** The API key that last reached the MCP endpoint, so Disconnect revokes that one and no other. */
+  keyId: text("key_id"),
 })
 
 /** A rendered MP4 of a project (see the plan, §9). The render runs as a Trigger.dev task. */
