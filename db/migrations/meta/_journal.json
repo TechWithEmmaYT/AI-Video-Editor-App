@@ -64,6 +64,13 @@
       "when": 1792512314046,
       "tag": "0008_export",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792569661458,
+      "tag": "0009_claude_status_key",
+      "breakpoints": true
     }
   ]
 }

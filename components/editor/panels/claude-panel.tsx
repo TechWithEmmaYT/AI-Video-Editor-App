@@ -63,14 +63,16 @@ export function ClaudePanel() {
 
 function ClaudeStatus() {
   // Checked every few seconds while this tab is open (live events replace this with the realtime phase).
-  const { data: lastSeenAt, isPending, isError } = useQuery({
+  const { data: status, isPending, isError } = useQuery({
     queryKey: queryKeys.claudeStatus,
     queryFn: getClaudeStatusQueryFn,
     refetchInterval: 5_000,
     refetchOnWindowFocus: true,
   })
+  const [confirming, setConfirming] = useState(false)
   const now = useNow(5_000)
 
+  const lastSeenAt = status?.lastSeenAt ?? null
   const seenMs = lastSeenAt ? now - new Date(lastSeenAt).getTime() : null
   const state = isError
     ? "error"
@@ -88,80 +90,75 @@ function ClaudeStatus() {
     working: "Working…",
     connected: `Connected · seen ${lastSeenAt ? timeAgo(lastSeenAt, now) : ""}`,
   }[state]
+  const linked = state === "connected" || state === "working"
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-muted/60 px-4 py-3.5" role="status" aria-live="polite">
-      <span className="relative flex size-2.5 shrink-0">
-        {state === "working" && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />}
-        <span
-          className={cn(
-            "relative size-2.5 rounded-full",
-            state === "working" || state === "connected" ? "bg-emerald-500" : "bg-muted-foreground/50"
-          )}
-        />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">{label}</p>
-        <p className="text-xs text-muted-foreground">
-          {state === "never"
-            ? "Claude Code hasn't connected with a key yet."
-            : state === "error"
-              ? "Couldn't check the connection. Retrying…"
-              : "Claude Code over MCP"}
-        </p>
+    <div className="flex flex-col gap-3 rounded-2xl bg-muted/60 px-4 py-3.5">
+      <div className="flex items-center gap-3" role="status" aria-live="polite">
+        <span className="relative flex size-2.5 shrink-0">
+          {state === "working" && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />}
+          <span className={cn("relative size-2.5 rounded-full", linked ? "bg-emerald-500" : "bg-muted-foreground/50")} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{label}</p>
+          <p className="text-xs text-muted-foreground">
+            {state === "never"
+              ? "Claude Code hasn't connected with a key yet."
+              : state === "error"
+                ? "Couldn't check the connection. Retrying…"
+                : "Claude Code over MCP"}
+          </p>
+        </div>
+        {linked && !confirming && (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="h-8 shrink-0 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+          >
+            Disconnect
+          </button>
+        )}
       </div>
-      {(state === "connected" || state === "working") && <DisconnectButton />}
+      {linked && confirming && <ConfirmDisconnect keyId={status?.keyId ?? null} onClose={() => setConfirming(false)} />}
     </div>
   )
 }
 
-/** Revokes every key and clears the status, so Claude Code's next request fails. */
-function DisconnectButton() {
+/** Its own row under the status, so the question never squeezes the status text. Revokes only the key Claude uses. */
+function ConfirmDisconnect({ keyId, onClose }: { keyId: string | null; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const [confirming, setConfirming] = useState(false)
 
   const disconnect = useMutation({
-    mutationFn: disconnectClaudeMutationFn,
-    onSuccess: (revoked) => {
-      queryClient.setQueryData(queryKeys.claudeStatus, null)
+    mutationFn: () => disconnectClaudeMutationFn(keyId),
+    onSuccess: () => {
+      queryClient.setQueryData(queryKeys.claudeStatus, { lastSeenAt: null, keyId: null })
       queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys })
-      setConfirming(false)
-      toast.success("Disconnected Claude Code", {
-        description: revoked === 0 ? "There were no keys to revoke." : `Revoked ${revoked} key${revoked === 1 ? "" : "s"}.`,
-      })
+      onClose()
+      toast.success("Disconnected Claude Code", { description: "Its key was revoked. Your other keys still work." })
     },
     onError: (error) => toast.error("Couldn't disconnect", { description: error.message }),
   })
 
-  if (!confirming) {
-    return (
-      <button
-        type="button"
-        onClick={() => setConfirming(true)}
-        className="h-8 shrink-0 rounded-full border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
-      >
-        Disconnect
-      </button>
-    )
-  }
-
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      <button
-        type="button"
-        onClick={() => setConfirming(false)}
-        className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        disabled={disconnect.isPending}
-        onClick={() => disconnect.mutate()}
-        className="h-8 rounded-full bg-destructive px-3 text-xs font-semibold text-white disabled:opacity-60"
-      >
-        {disconnect.isPending ? "Revoking…" : "Revoke all keys"}
-      </button>
+    <div className="flex flex-col gap-2.5 border-t border-border pt-3">
+      <p className="text-xs text-muted-foreground">Claude stops working until you connect it again with a new key.</p>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={disconnect.isPending}
+          onClick={() => disconnect.mutate()}
+          className="h-8 rounded-full bg-destructive px-3 text-xs font-semibold text-white disabled:opacity-60"
+        >
+          {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+        </button>
+      </div>
     </div>
   )
 }

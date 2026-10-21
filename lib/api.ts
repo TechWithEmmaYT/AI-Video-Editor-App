@@ -173,10 +173,10 @@ export async function saveEditorStateMutationFn(input: { projectId: string; sele
   await api.post("/editor-state", input)
 }
 
-/** When the user's Claude Code last reached the MCP endpoint (null = never). */
+/** When the user's Claude Code last reached the MCP endpoint, and with which key (both null = never). */
 export async function getClaudeStatusQueryFn() {
   const { data } = await api.get<ClaudeStatusResponse>("/claude/status")
-  return data.lastSeenAt
+  return data
 }
 
 // ── Auth (Better Auth client) ───────────────────────────────────────────
@@ -236,14 +236,10 @@ export async function revokeApiKeyMutationFn(keyId: string) {
 }
 
 /**
- * Disconnects Claude Code: revokes every key, so its next request fails, and clears the
- * last-seen time so the status doesn't keep reading "Connected". Returns how many it revoked.
+ * Disconnects Claude Code: revokes the key it is connected with, so its next request fails, and
+ * clears the last-seen time so the status doesn't keep reading "Connected". Other keys stay.
  */
-export async function disconnectClaudeMutationFn() {
-  const keys = await listApiKeysQueryFn()
-  for (const key of keys) {
-    await revokeApiKeyMutationFn(key.id)
-  }
+export async function disconnectClaudeMutationFn(keyId: string | null) {
+  if (keyId) await revokeApiKeyMutationFn(keyId)
   await api.delete("/claude/status")
-  return keys.length
 }
