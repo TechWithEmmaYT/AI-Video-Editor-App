@@ -33,20 +33,32 @@ export const kineticCaption: ElementDef = {
     { key: "emphasisColor", label: "Emphasis colour", type: "color", default: "#ff3b30" },
     { key: "emphasisItalic", label: "Emphasis italic", type: "boolean", default: true },
     { key: "emphasisScale", label: "Emphasis size", type: "number", default: 1.12, min: 0.5, max: 2, step: 0.02 },
-    { key: "highlight", label: "Marker", type: "select", default: "none", options: ["none", "box", "underline"] },
+    { key: "highlight", label: "Marker", type: "select", default: "none", options: ["line", "none", "box", "underline"] },
     { key: "highlightColor", label: "Marker colour", type: "color", default: "#ff3b30" },
     { key: "highlightHold", label: "Keep marker on emphasis words", type: "boolean", default: false },
-    { key: "animation", label: "Animation", type: "select", default: "pop", options: ["pop", "slide", "fade"] },
+    { key: "animation", label: "Animation", type: "select", default: "pop", options: ["blur-rise", "pop", "slide", "fade"] },
     { key: "shadow", label: "Shadow (for busy b-roll)", type: "boolean", default: true },
+    { key: "arrange", label: "Arrange", type: "select", default: "inline", options: ["lead-in", "inline"] },
+    { key: "leadScale", label: "Lead-in size", type: "number", default: 0.4, min: 0.2, max: 1, step: 0.05 },
+    { key: "leadOpacity", label: "Lead-in opacity", type: "number", default: 0.7, min: 0.15, max: 1, step: 0.05 },
+    { key: "accentFont", label: "Accent font (~word~)", type: "font", default: "Instrument Serif" },
+    { key: "accentWeight", label: "Accent weight", type: "number", default: 400, min: 100, max: 900, step: 100 },
+    { key: "accentColor", label: "Accent colour", type: "color", default: "#ffffff" },
+    { key: "tracking", label: "Letter spacing (em)", type: "number", default: 0, min: -0.15, max: 0.3, step: 0.01 },
+    { key: "fill", label: "Letter fill", type: "select", default: "solid", options: ["texture", "solid"] },
+    { key: "fillColor2", label: "Texture second colour", type: "color", default: "#c48b96" },
+    { key: "fillOpacity", label: "Letter opacity", type: "number", default: 1, min: 0.3, max: 1, step: 0.05 },
+    { key: "fitWidth", label: "Fill the width", type: "boolean", default: false },
   ],
   defaultParams: {},
   createdBy: "builtin",
-  code: `// Words appear one by one at their own time. "|" starts a new line; *word* marks emphasis.
+  code: `// Words appear one by one at their own time. "|" starts a new line; *word* marks emphasis, ~word~ an accent.
 // times = each word's start in seconds from the clip's start (flat, across every line).
 const lines = String(p.text).split("|").map((line) =>
   line.trim().split(" ").filter(Boolean).map((raw) => {
     const emphasis = raw.length > 2 && raw.startsWith("*") && raw.endsWith("*")
-    return { text: emphasis ? raw.slice(1, -1) : raw, emphasis }
+    const accent = raw.length > 2 && raw.startsWith("~") && raw.endsWith("~")
+    return { text: emphasis || accent ? raw.slice(1, -1) : raw, emphasis, accent }
   })
 ).filter((line) => line.length > 0)
 if (lines.length === 0) return
@@ -63,58 +75,90 @@ let live = -1
 for (let i = 0; i < flat.length; i++) if (t >= starts[i]) live = i
 const liveRow = live >= 0 ? flat[live].row : -1
 
+// "lead-in" splits a line in two: its lesser words small and faint on top, its key words big below.
+const isKey = (word) => word.emphasis || word.accent
+const groups = []
+lines.forEach((line, lineIndex) => {
+  const keys = line.filter(isKey)
+  if (p.arrange !== "lead-in" || keys.length === 0 || keys.length === line.length) {
+    groups.push({ lineIndex, words: line, tier: 1, lead: false })
+    return
+  }
+  groups.push({ lineIndex, words: line.filter((word) => !isKey(word)), tier: p.leadScale, lead: true })
+  groups.push({ lineIndex, words: keys, tier: 1, lead: false })
+})
+
 const base = h * 0.55 * p.scale
-const fontFor = (word, size) =>
-  word.emphasis
-    ? M.font(p.emphasisFont, p.emphasisWeight, size * p.emphasisScale, p.emphasisItalic ? "italic" : "normal")
-    : M.font(p.font, p.weight, size)
+const setFont = (word, size) => {
+  if (word.emphasis) ctx.font = M.font(p.emphasisFont, p.emphasisWeight, size * p.emphasisScale, p.emphasisItalic ? "italic" : "normal")
+  else if (word.accent) ctx.font = M.font(p.accentFont, p.accentWeight, size * p.emphasisScale, "italic")
+  else ctx.font = M.font(p.font, p.weight, size)
+  ctx.letterSpacing = p.tracking * size + "px"
+}
 const gapFor = (size) => size * 0.26
 
 // Lay the words out at this size, wrapping each line that runs past the box. "|" is a hard break.
 const layout = (size) => {
   const rows = []
-  lines.forEach((line, lineIndex) => {
-    let row = { lineIndex, words: [], width: 0 }
-    for (const word of line) {
-      ctx.font = fontFor(word, size)
+  groups.forEach((group) => {
+    const rowSize = size * group.tier
+    let row = { lineIndex: group.lineIndex, lead: group.lead, size: rowSize, words: [], width: 0 }
+    for (const word of group.words) {
+      setFont(word, rowSize)
       const width = ctx.measureText(word.text).width
-      const gap = row.words.length ? gapFor(size) : 0
+      const gap = row.words.length ? gapFor(rowSize) : 0
       if (row.words.length && row.width + gap + width > w * 0.96) {
         rows.push(row)
-        row = { lineIndex, words: [], width: 0 }
+        row = { lineIndex: group.lineIndex, lead: group.lead, size: rowSize, words: [], width: 0 }
       }
-      row.width += (row.words.length ? gapFor(size) : 0) + width
+      row.width += (row.words.length ? gapFor(rowSize) : 0) + width
       row.words.push({ word, width })
     }
     if (row.words.length) rows.push(row)
   })
   return rows
 }
+const heightOf = (rows) => {
+  let total = 0
+  for (const row of rows) total += row.size * 1.2
+  return total
+}
 
 // Shrink until the wrapped rows fit the box's height, rather than squeezing one long line to nothing.
 let size = base
 let rows = layout(size)
-while (rows.length * size * 1.2 > h && size > base * 0.3) {
+while (heightOf(rows) > h && size > base * 0.3) {
   size *= 0.9
   rows = layout(size)
 }
-const lineHeight = size * 1.2
+// "Fill the width": grow or shrink so the widest row spans the box, as long as the rows still fit its height.
+if (p.fitWidth) {
+  let widest = 0
+  for (const row of rows) widest = Math.max(widest, row.width)
+  if (widest > 0) {
+    size = Math.min((size * w * 0.92) / widest, (size * h) / heightOf(rows))
+    rows = layout(size)
+  }
+}
 
 ctx.textAlign = "center"
 ctx.textBaseline = "alphabetic"
 const outro = 1 - M.clamp((u - 0.94) / 0.06)
-const top = (h - lineHeight * rows.length) / 2
+const entrance = p.animation === "blur-rise" ? 0.3 : 0.16
+let rowTop = (h - heightOf(rows)) / 2
 
-rows.forEach((row, rowIndex) => {
+rows.forEach((row) => {
+  const rowSize = row.size
+  const baseline = rowTop + rowSize * 0.82
+  rowTop += rowSize * 1.2
   // In "lines" mode a line waits for its own first word; otherwise every line is laid out at once.
   if (p.mode === "lines" && lines[row.lineIndex][0].index > live) return
-  const baseline = top + lineHeight * rowIndex + size * 0.82
   let x = (w - row.width) / 2
 
   row.words.forEach(({ word, width }) => {
-    const k = M.clamp((t - starts[word.index]) / 0.16)
+    const k = M.clamp((t - starts[word.index]) / entrance)
     const center = x + width / 2
-    x += width + gapFor(size)
+    x += width + gapFor(rowSize)
     if (k <= 0) return
 
     // Words already said step back, so the live one reads first.
@@ -124,13 +168,18 @@ rows.forEach((row, rowIndex) => {
       : 1
 
     ctx.save()
-    ctx.globalAlpha = M.clamp(k * 2) * settled * outro
-    const lift = p.animation === "slide" ? (1 - M.ease.outCubic(k)) * size * 0.4 : 0
+    ctx.globalAlpha = M.clamp(k * 2) * settled * outro * (row.lead ? p.leadOpacity : 1)
+    const lift =
+      p.animation === "slide" ? (1 - M.ease.outCubic(k)) * rowSize * 0.4
+      : p.animation === "blur-rise" ? (1 - M.ease.outCubic(k)) * rowSize * 0.22
+      : 0
     ctx.translate(center, baseline + lift)
     if (p.animation === "pop") { const s = 0.6 + 0.4 * M.ease.outBack(k); ctx.scale(s, s) }
+    if (p.animation === "blur-rise" && k < 1) ctx.filter = "blur(" + (1 - M.ease.outCubic(k)) * rowSize * 0.12 + "px)"
 
-    // The marker: held on emphasis words, or sweeping in behind each word and away again.
-    if (p.highlight !== "none") {
+    // The marker: held on emphasis words, or sweeping in behind each word and away again. A lead-in
+    // only ever marks its emphasis word.
+    if ((p.highlight === "box" || p.highlight === "underline") && (p.arrange !== "lead-in" || word.emphasis)) {
       const held = p.highlightHold && word.emphasis
       const sweep = M.clamp((t - starts[word.index]) / 0.22)
       const show = held ? M.ease.outCubic(k) : M.ease.outCubic(k) * (1 - M.ease.outCubic(M.clamp((sweep - 0.55) / 0.45)))
@@ -138,29 +187,132 @@ rows.forEach((row, rowIndex) => {
         ctx.save()
         ctx.globalAlpha *= show
         ctx.fillStyle = p.highlightColor
-        const padX = size * 0.14
+        const padX = rowSize * 0.14
         if (p.highlight === "underline") {
-          ctx.fillRect(-width / 2 - padX, size * 0.18, (width + padX * 2) * show, size * 0.12)
+          ctx.fillRect(-width / 2 - padX, rowSize * 0.18, (width + padX * 2) * show, rowSize * 0.12)
         } else {
           const boxW = (width + padX * 2) * (held ? 1 : show)
           ctx.beginPath()
-          ctx.roundRect(-boxW / 2, -size * 0.78, boxW, size * 1.02, size * 0.08)
+          ctx.roundRect(-boxW / 2, -rowSize * 0.78, boxW, rowSize * 1.02, rowSize * 0.08)
           ctx.fill()
         }
         ctx.restore()
       }
     }
+    // A thin line drawn on from the left under each emphasis word as it lands, then held.
+    if (p.highlight === "line" && word.emphasis) {
+      const drawn = M.ease.inOutCubic(M.clamp((t - starts[word.index] - 0.08) / 0.4))
+      if (drawn > 0) {
+        ctx.fillStyle = p.highlightColor
+        ctx.beginPath()
+        ctx.roundRect(-width / 2, rowSize * 0.16, width * drawn, rowSize * 0.055, rowSize * 0.03)
+        ctx.fill()
+      }
+    }
 
     if (p.shadow) {
       ctx.shadowColor = "rgba(0, 0, 0, 0.5)"
-      ctx.shadowBlur = size * 0.12
-      ctx.shadowOffsetY = size * 0.04
+      ctx.shadowBlur = rowSize * 0.12
+      ctx.shadowOffsetY = rowSize * 0.04
     }
-    ctx.font = fontFor(word, size)
+    setFont(word, rowSize)
     // A word sitting on a held marker reads as white, not as the marker's own colour.
-    ctx.fillStyle = p.highlightHold && word.emphasis && p.highlight === "box" ? "#ffffff" : word.emphasis ? p.emphasisColor : p.color
+    if (p.highlightHold && word.emphasis && p.highlight === "box") ctx.fillStyle = "#ffffff"
+    else if (word.emphasis) ctx.fillStyle = p.emphasisColor
+    else if (word.accent) ctx.fillStyle = p.accentColor
+    else if (p.fill === "texture") {
+      // A mottled wash between the two colours, different on every word but the same every frame.
+      const wash = ctx.createLinearGradient(-width / 2, -rowSize * 0.8, width / 2, rowSize * 0.1)
+      for (let i = 0; i <= 4; i++) wash.addColorStop(i / 4, M.mix(p.color, p.fillColor2, M.noise2(word.index * 1.7, i * 0.9)))
+      ctx.fillStyle = wash
+      ctx.globalAlpha *= p.fillOpacity
+    } else ctx.fillStyle = p.color
     ctx.fillText(word.text, 0, 0)
     ctx.restore()
   })
 })`,
+}
+
+/*
+ * The Modern looks: the same caption with its params set, so people pick them from the Elements
+ * tab and add_captions picks them by `look`. Each one loads only the fonts it draws with.
+ */
+
+/** A faint lead-in line of the lesser words over the key word, set big on a red box. */
+export const leadInCaption: ElementDef = {
+  ...kineticCaption,
+  id: "lead-in-caption",
+  name: "Modern · Lead-in",
+  fonts: ["Inter Tight", "Instrument Serif"],
+  defaultParams: {
+    text: "then this *video*",
+    arrange: "lead-in",
+    leadScale: 0.4,
+    leadOpacity: 0.7,
+    font: "Inter Tight",
+    weight: 800,
+    color: "#ffffff",
+    emphasisFont: "Inter Tight",
+    emphasisWeight: 900,
+    emphasisColor: "#ffffff",
+    emphasisItalic: false,
+    emphasisScale: 1,
+    highlight: "box",
+    highlightColor: "#e11d2e",
+    highlightHold: true,
+    accentFont: "Instrument Serif",
+    accentWeight: 400,
+    accentColor: "#ffffff",
+    animation: "blur-rise",
+    shadow: true,
+  },
+}
+
+/** Rounded white words with the key word in purple, a thin line drawing on under it. */
+export const accentCaption: ElementDef = {
+  ...kineticCaption,
+  id: "accent-caption",
+  name: "Modern · Accent colour",
+  fonts: ["Poppins"],
+  defaultParams: {
+    text: "this one is *different*",
+    font: "Poppins",
+    weight: 600,
+    color: "#ffffff",
+    emphasisFont: "Poppins",
+    emphasisWeight: 800,
+    emphasisColor: "#8b5cf6",
+    emphasisItalic: false,
+    emphasisScale: 1,
+    highlight: "line",
+    highlightColor: "#8b5cf6",
+    animation: "blur-rise",
+    shadow: true,
+  },
+}
+
+/** Huge, tight, heavy type that fills the width, in a soft see-through pink wash; the shock word in solid red. */
+export const heavyCaption: ElementDef = {
+  ...kineticCaption,
+  id: "heavy-caption",
+  name: "Modern · Heavy fill",
+  fonts: ["Inter Tight"],
+  defaultParams: {
+    text: "stop *scrolling*",
+    font: "Inter Tight",
+    weight: 900,
+    tracking: -0.06,
+    fitWidth: true,
+    fill: "texture",
+    color: "#f2c9cf",
+    fillColor2: "#c48b96",
+    fillOpacity: 0.85,
+    emphasisFont: "Inter Tight",
+    emphasisWeight: 900,
+    emphasisColor: "#e11d2e",
+    emphasisItalic: false,
+    emphasisScale: 1,
+    animation: "blur-rise",
+    shadow: false,
+  },
 }

@@ -1,4 +1,4 @@
-import { talkingHeadBrief } from "@/lib/agent/briefs/talking-head"
+import { REEL_REFERENCES, talkingHeadBrief } from "@/lib/agent/briefs/talking-head"
 
 /**
  * Editorial reel: big soft-coloured type stacking a line at a time across the lower half, over a
@@ -33,4 +33,5 @@ export const stackedReel = talkingHeadBrief({
     "**One colour only.** Every caption and every card accent uses the same brand colour. Pick it in step 1 from the speaker's clothing or set, and never introduce a second.",
   ],
   extraElements: ["gradient-mesh"],
+  references: REEL_REFERENCES,
 })

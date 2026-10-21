@@ -1,4 +1,4 @@
-import { talkingHeadBrief } from "@/lib/agent/briefs/talking-head"
+import { REEL_REFERENCES, talkingHeadBrief } from "@/lib/agent/briefs/talking-head"
 
 /**
  * Bold reel: a red marker sweeps in behind each word as it's said, and the key words keep it.
@@ -33,4 +33,5 @@ export const markerReel = talkingHeadBrief({
     "**Statement cards.** Two or three times, cut the speaker entirely and go full screen: a Solid Colour (#f4f2ef) on the backdrop track, a **Stat Card** or **Quote Card** over it with `bg: \"#f4f2ef\"` and `radius: 0`, and the caption carrying on over the top. `animateIn: \"grow\"`, 8 frames. Hold for 1.5–2.5 s, then cut back.",
   ],
   extraElements: [],
+  references: REEL_REFERENCES,
 })

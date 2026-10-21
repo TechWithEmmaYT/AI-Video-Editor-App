@@ -1,4 +1,4 @@
-import { talkingHeadBrief } from "@/lib/agent/briefs/talking-head"
+import { REEL_REFERENCES, talkingHeadBrief } from "@/lib/agent/briefs/talking-head"
 
 /** Short vertical talking head: fast captions in the top third, b-roll every few seconds. */
 export const reelCaptions = talkingHeadBrief({
@@ -27,4 +27,5 @@ export const reelCaptions = talkingHeadBrief({
   music: "quiet, volume ≤ 0.2",
   extras: [],
   extraElements: [],
+  references: REEL_REFERENCES,
 })

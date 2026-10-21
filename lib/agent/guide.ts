@@ -1,4 +1,5 @@
 import { BRIEFS, findBrief } from "@/lib/agent/briefs"
+import { REEL_REFERENCES } from "@/lib/agent/briefs/talking-head"
 import { MAX_FRAME_MS, MAX_TICKS } from "@/lib/code-clips/compile"
 import { BANNED_PROPERTIES, CODE_PARAMS, MAX_CODE_BYTES, SAFE_GLOBALS } from "@/lib/code-clips/validate"
 import { BUILTIN_ELEMENTS } from "@/lib/elements/builtin"
@@ -145,6 +146,7 @@ const assets = () => `# Free assets
 
 Find files yourself with web search/fetch or a browser; no API keys or extra tools. Use **direct file URLs** (the file itself, not its web page), then \`add_media_from_url\`, then use the mediaId. **Never put outside URLs in clips.**
 
+- **Reference reels and shorts (to match a look, not to use as footage):** ${REEL_REFERENCES.join(" ")}
 - **B-roll video & photos:** Pexels (free, no attribution needed), Pixabay (free; hotlinking isn't allowed, so always bring files in). Prefer **≤ 720p** video (smaller, faster).
 - **Sound effects & music:** Pixabay sound effects / music.
 - **Logos:** https://api.svgl.app (SVG; JSON list with file URLs). Add with \`add_media_from_url\`, or draw inline with \`M.svg(markup)\` in a code clip. Use a brand's logo only to show that brand.
@@ -152,6 +154,7 @@ Find files yourself with web search/fetch or a browser; no API keys or extra too
 
 const recipes = () => `# Recipes
 
+- **Modern captions for Reels, TikTok and Shorts:** \`add_captions\` with \`look: "lead-in"\` (a faint lead-in line over one big key word on a red box), \`"accent"\` (white words, the key word purple with a line drawing on under it) or \`"heavy-fill"\` (huge heavy words in a soft pink wash, a rare shock word in red). One key word per phrase. Briefs: \`brief:lead-in-reel\`, \`brief:accent-reel\`, \`brief:heavy-fill-reel\`.
 - **Kinetic captions:** Kinetic Caption element, 1–4 words, \`*word*\` for one emphasis word, \`times\` from the transcript's word timings. Never shorter than 0.6 s.
 - **Pop-in callouts / stickers:** Badge Pop / Highlight Box / Arrow Pointer, 1.5–3 s, entering on the word that mentions them.
 - **Lower thirds:** Bar Lower Third / Pill Name Tag in the first 10 s, 3–5 s, name + role.

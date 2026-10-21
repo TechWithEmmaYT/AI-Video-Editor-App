@@ -23,6 +23,8 @@ export type TalkingHeadStyle = {
     look: string
     /** The `mode` param: "replace" (one phrase at a time), "words" or "lines" (they build up). */
     mode: "replace" | "words" | "lines"
+    /** A caption element other than the Kinetic Caption, and the add_captions `look` that lays it. */
+    element?: { id: string; name: string; look: string }
   }
   broll: {
     every: string
@@ -41,7 +43,15 @@ export type TalkingHeadStyle = {
   extras: string[]
   /** Extra built-in elements the extras use. */
   extraElements: string[]
+  /** Where to find reference videos of this kind, one line each. */
+  references?: string[]
 }
+
+/** Where to find reference reels and shorts to match, for the vertical briefs. */
+export const REEL_REFERENCES = [
+  "Pinterest is full of reel and short edits to match. An example of this kind: https://www.pinterest.com/pin/1073123417590337055/",
+  'Search Pinterest for more: https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed, changing the `q=` words to what you need, e.g. "reel captions" or "talking head reel edit".',
+]
 
 const SHARED_TOOLS = ["get_project", "get_media", "get_media_transcript", "add_captions", "add_media_from_url", "add_clip", "update_clip"]
 
@@ -56,6 +66,12 @@ function brollKinds(kinds: TalkingHeadStyle["broll"]["kinds"]) {
 
 export function talkingHeadBrief(style: TalkingHeadStyle): Brief {
   const { caption, broll } = style
+  const captionId = caption.element?.id ?? "kinetic-caption"
+  const captionName = caption.element?.name ?? "Kinetic Caption"
+  const captionTool = caption.element
+    ? `   - **Fastest:** \`add_captions({ mediaId, look: "${caption.element.look}" })\` lays the whole track in this look, one key word marked per phrase. Then fix a phrase by hand with \`update_clip\` where the key word it picked isn't the one you'd say loudest.\n`
+    : ""
+  const references = style.references?.length ? `\n## References\n\n${style.references.map((line) => `- ${line}`).join("\n")}\n` : ""
   const extras = style.extras.map((step, i) => `${6 + i}. ${step}`).join("\n")
   const checkStep = 6 + style.extras.length
 
@@ -64,7 +80,7 @@ export function talkingHeadBrief(style: TalkingHeadStyle): Brief {
     name: style.name,
     summary: style.summary,
     formats: [style.format],
-    elements: ["kinetic-caption", "solid-colour", ...(style.broll.kinds.includes("graphic") ? ["checklist-card", "stat-card", "quote-card"] : []), ...style.extraElements],
+    elements: [captionId, "solid-colour", ...(style.broll.kinds.includes("graphic") ? ["checklist-card", "stat-card", "quote-card"] : []), ...style.extraElements],
     tools: SHARED_TOOLS,
     body: `# ${style.name}
 
@@ -72,7 +88,7 @@ export function talkingHeadBrief(style: TalkingHeadStyle): Brief {
 
 ## Tracks (top to bottom)
 
-1. **Captions**: one Kinetic Caption clip per phrase.
+1. **Captions**: one ${captionName} clip per phrase.
 2. **B-roll**: video or image clips, **volume 0** so the speaker's voice keeps playing.
 3. **Backdrop**: Solid Colour (black), only under b-roll shown as a card.
 4. **Speaker**: the talking-head video, full screen, with its own audio, from start to end.
@@ -84,7 +100,7 @@ export function talkingHeadBrief(style: TalkingHeadStyle): Brief {
 2. Call \`get_media_transcript\` on the speaker's mediaId. Word timings come with ImageKit transcripts. Without them, spread the words evenly. Source time → timeline frame: \`clip.from + round(sourceSeconds × fps) − clip.trimStartFrames\`.
 3. **Captions.** Split the speech into phrases of **${caption.words}**, at natural pauses, never across sentences.
    - **Emphasis:** ${caption.emphasis}. Write it as \`*word*\` in \`text\`, e.g. \`"this changes *everything*"\`.
-   - Add a **Kinetic Caption** per phrase on the captions track. Set \`from\` to the frame of the phrase's first word. It lasts until the next phrase starts, or until the last word ends + 0.3 s at a pause. Never shorter than 0.6 s.
+${captionTool}   - Add a **${captionName}** per phrase on the captions track. Set \`from\` to the frame of the phrase's first word. It lasts until the next phrase starts, or until the last word ends + 0.3 s at a pause. Never shorter than 0.6 s.
    - Set \`times\` to each word's start in seconds **from the caption's start**, 2 decimals: \`"0, 0.28, 0.61"\`.
    - Set \`scale: ${caption.scale}\` and \`mode: "${caption.mode}"\`. **Placement:** ${caption.placement}. Captions on one track must not overlap.
    - **The look is the style.** Set these on every caption, the same on all of them: ${caption.look}
@@ -111,6 +127,6 @@ ${extras ? `${extras}\n` : ""}${checkStep}. **Check:** call \`get_project\` agai
 | B-roll | every ${broll.every}, ${broll.length} each, ${broll.kinds.join(" + ")}, footage at volume 0, at most ${broll.maxShare} of the video |
 | Card | ${broll.card}, on black |
 | Safe zone (${style.format}) | ${style.safeZone} |
-`,
+${references}`,
   }
 }
