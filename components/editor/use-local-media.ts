@@ -56,7 +56,9 @@ export function useLocalMedia(projectId: string) {
 export function keepUploadedCopy(projectId: string, media: Media, file: File) {
   if (!playsLocally(media)) return
   useLocalMediaStore.getState().add(projectId, media.id, media.url, file)
-  loadOnce(media.id, () => storeCopy(media.id, file))
+  loadOnce(media.id, async () => {
+    await storeCopy(media.id, file)
+  })
 }
 
 function loadOnce(mediaId: string, load: () => Promise<void>) {
