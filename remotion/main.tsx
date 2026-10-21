@@ -38,9 +38,21 @@ export type MainProps = {
   doc: Doc
   /** The editor sets this: a file that won't play only warns. Export leaves it off, so a broken file fails the render. */
   preview?: boolean
+  /**
+   * The editor's Player only: ImageKit URL → a copy in this browser (stores/local-media-store.ts),
+   * so cuts seek a local file. Export leaves it off and plays the ImageKit originals.
+   */
+  localSources?: LocalSources
 }
 
-export function Main({ doc, preview = false }: MainProps) {
+type LocalSources = Record<string, string>
+
+/** Where a video or audio clip's file plays from. */
+function playbackUrl(src: string, localSources: LocalSources | undefined) {
+  return localSources?.[src] ?? originalMediaUrl(src)
+}
+
+export function Main({ doc, preview = false, localSources }: MainProps) {
   const { fps } = useVideoConfig()
   const trackIndex = new Map(doc.tracks.map((track, index) => [track.id, index]))
   // Track 0 is the top row: paint the bottom track first and track 0 last, so it lands on top.
@@ -58,7 +70,7 @@ export function Main({ doc, preview = false }: MainProps) {
           const { clip } = item
           return (
             <Sequence key={clip.id} name={clip.name} from={clip.from} durationInFrames={clip.durationInFrames} premountFor={clip.type === "audio" ? fps * AUDIO_PREMOUNT_SECONDS : fps}>
-              <ClipView clip={clip} preview={preview} />
+              <ClipView clip={clip} preview={preview} localSources={localSources} />
             </Sequence>
           )
         }
@@ -72,7 +84,7 @@ export function Main({ doc, preview = false }: MainProps) {
             durationInFrames={last.from + last.durationInFrames - first.from}
             premountFor={fps}
           >
-            <VideoRunView clips={item.clips} preview={preview} />
+            <VideoRunView clips={item.clips} preview={preview} localSources={localSources} />
           </Sequence>
         )
       })}
@@ -80,14 +92,16 @@ export function Main({ doc, preview = false }: MainProps) {
   )
 }
 
-function ClipView({ clip, preview }: { clip: Clip; preview: boolean }) {
+type MediaViewProps = { preview: boolean; localSources: LocalSources | undefined }
+
+function ClipView({ clip, preview, localSources }: { clip: Clip } & MediaViewProps) {
   switch (clip.type) {
     case "video":
       return (
         <Layer clip={clip} radius={clip.radius}>
           <Video
-            // The original file, untouched: no ImageKit video processing, in the editor or the export.
-            src={originalMediaUrl(clip.src)}
+            // The original file, untouched (no ImageKit video processing), or the editor's local copy of it.
+            src={playbackUrl(clip.src, localSources)}
             trimBefore={clip.trimStartFrames}
             volume={clip.volume}
             objectFit={clip.fit}
@@ -109,7 +123,7 @@ function ClipView({ clip, preview }: { clip: Clip; preview: boolean }) {
         </Layer>
       )
     case "audio":
-      return <AudioView clip={clip} preview={preview} />
+      return <AudioView clip={clip} preview={preview} localSources={localSources} />
     case "text":
       return (
         <Layer clip={clip}>
@@ -129,13 +143,13 @@ function ClipView({ clip, preview }: { clip: Clip; preview: boolean }) {
  * Several continuous clips of one video as a single <Video> (one decoder): the file plays straight
  * through while each frame takes its box, radius and volume from the clip on screen then.
  */
-function VideoRunView({ clips, preview }: { clips: VideoClip[]; preview: boolean }) {
+function VideoRunView({ clips, preview, localSources }: { clips: VideoClip[] } & MediaViewProps) {
   const frame = useCurrentFrame()
   const active = clipAt(clips, frame)
   return (
     <Layer clip={active} radius={active.radius}>
       <Video
-        src={originalMediaUrl(clips[0].src)}
+        src={playbackUrl(clips[0].src, localSources)}
         trimBefore={clips[0].trimStartFrames}
         volume={(f) => clipAt(clips, f).volume}
         objectFit={active.fit}
@@ -169,7 +183,7 @@ function Layer({ clip, radius, children }: { clip: Clip; radius?: number; childr
   )
 }
 
-function AudioView({ clip, preview }: { clip: AudioClip; preview: boolean }) {
+function AudioView({ clip, preview, localSources }: { clip: AudioClip } & MediaViewProps) {
   // Inside the clip's <Sequence>, so frame 0 is the clip's first frame.
   const frame = useCurrentFrame()
   const { durationInFrames: length, fadeInFrames: fadeIn, fadeOutFrames: fadeOut } = clip
@@ -180,7 +194,7 @@ function AudioView({ clip, preview }: { clip: AudioClip; preview: boolean }) {
 
   return (
     <Audio
-      src={originalMediaUrl(clip.src)}
+      src={playbackUrl(clip.src, localSources)}
       trimBefore={clip.trimStartFrames}
       volume={clip.volume * fadeInLevel * fadeOutLevel}
       fallbackHtml5AudioProps={preview ? { onError: warnMediaError(clip.name) } : undefined}
