@@ -8,6 +8,7 @@ import { LeftPanel } from "@/components/editor/left-panel"
 import { Timeline } from "@/components/editor/timeline/timeline"
 import { TopBar } from "@/components/editor/top-bar"
 import { useEditorShortcuts } from "@/components/editor/use-editor-shortcuts"
+import { useLocalMedia } from "@/components/editor/use-local-media"
 import { useProjectEvents } from "@/components/editor/use-project-events"
 import { saveEditorStateMutationFn } from "@/lib/api"
 import { useEditorStore } from "@/stores/editor-store"
@@ -30,6 +31,7 @@ export function Editor({ project }: { project: ProjectWithDoc }) {
   useWarnBeforeLeavingUnsaved()
   useReportEditorState(project.id)
   useProjectEvents(project.id)
+  useLocalMedia(project.id)
   const timeline = useResizableTimeline()
 
   return (
