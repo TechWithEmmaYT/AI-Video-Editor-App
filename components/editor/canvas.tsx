@@ -28,7 +28,7 @@ export function Canvas() {
   const height = useEditorStore((state) => state.height)
   const fps = useEditorStore((state) => state.fps)
   const select = useEditorStore((state) => state.select)
-  const localSources = useLocalMediaStore((state) => state.sources)
+  const localSources = usePlaybackSources()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const available = useElementSize(containerRef)
@@ -110,6 +110,19 @@ export function Canvas() {
       </div>
     </section>
   )
+}
+
+/**
+ * The local copies the preview plays from, held still while it plays. A copy that becomes ready
+ * mid-play would swap a clip's src: its player restarts while the old one's queued audio still
+ * plays, so the opening is heard twice. The swap waits for the next pause instead.
+ */
+function usePlaybackSources() {
+  const sources = useLocalMediaStore((state) => state.sources)
+  const playing = useEditorStore((state) => state.playing)
+  const [held, setHeld] = useState(sources)
+  if (!playing && held !== sources) setHeld(sources)
+  return playing ? held : sources
 }
 
 /** Mirrors the Player into the store: the ref (for seek/play) and its frame/playing events. */
