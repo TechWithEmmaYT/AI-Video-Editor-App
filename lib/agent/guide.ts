@@ -174,7 +174,10 @@ Before you design any look (captions, cards, b-roll, pacing), look for reference
 
 const recipes = () => `# Recipes
 
-- **Modern captions for Reels, TikTok and Shorts:** \`add_captions\` with \`look: "lead-in"\` (a faint lead-in line over one big key word on a red box), \`"accent"\` (white words, the key word purple with a line drawing on under it) or \`"heavy-fill"\` (huge heavy words in a soft pink wash, a rare shock word in red). One key word per phrase. Briefs: \`brief:lead-in-reel\`, \`brief:accent-reel\`, \`brief:heavy-fill-reel\`.
+- **Captions: references first, never a copy.** Before you caption, look at your Pinterest references for this kind of video. Then pick the look that matches them and set its colours from the video: the accents must suit the footage (skin, background, brand) and read on it. Don't reuse an earlier project's style or a look's default colours just because they're there.
+- **Default for 9:16: crisp.** \`add_captions\` with no \`look\` on a 9:16 project uses \`"crisp"\`: Montserrat 800, lowercase, tight, white, the key word in a warm accent (\`emphasisColor\`), a soft shadow, no box, words popping in on their timings, 1–4 words per caption. Mark only the 5–8 payoff words of the whole video as \`~word~\` (the punch accent, \`accentColor\`). Two accents, never more. Brief: \`brief:crisp-reel\`.
+- **Caption safe zone (9:16):** x 64, y 1020, width 952, height 400 on 1080×1920 (between 53% and 74% down): below the face, above the app's buttons. \`add_captions\` puts crisp there; \`render_frames\` flags captions outside it.
+- **Other Modern looks:** \`add_captions\` with \`look: "lead-in"\` (a faint lead-in line over one big key word on a red box), \`"accent"\` (white words, the key word purple with a line drawing on under it) or \`"heavy-fill"\` (huge heavy words in a soft pink wash, a rare shock word in red). One key word per phrase. Briefs: \`brief:lead-in-reel\`, \`brief:accent-reel\`, \`brief:heavy-fill-reel\`.
 - **Kinetic captions:** Kinetic Caption element, 1–4 words, \`*word*\` for one emphasis word, \`times\` from the transcript's word timings. Never shorter than 0.6 s.
 - **Pop-in callouts / stickers:** Badge Pop / Highlight Box / Arrow Pointer, 1.5–3 s, entering on the word that mentions them.
 - **Lower thirds:** Bar Lower Third / Pill Name Tag in the first 10 s, 3–5 s, name + role.

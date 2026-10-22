@@ -33,6 +33,7 @@ export const kineticCaption: ElementDef = {
     { key: "emphasisColor", label: "Emphasis colour", type: "color", default: "#ff3b30" },
     { key: "emphasisItalic", label: "Emphasis italic", type: "boolean", default: true },
     { key: "emphasisScale", label: "Emphasis size", type: "number", default: 1.12, min: 0.5, max: 2, step: 0.02 },
+    { key: "emphasisFit", label: "Smaller emphasis for long words", type: "boolean", default: false },
     { key: "highlight", label: "Marker", type: "select", default: "none", options: ["line", "none", "box", "underline"] },
     { key: "highlightColor", label: "Marker colour", type: "color", default: "#ff3b30" },
     { key: "highlightHold", label: "Keep marker on emphasis words", type: "boolean", default: false },
@@ -44,6 +45,8 @@ export const kineticCaption: ElementDef = {
     { key: "accentFont", label: "Accent font (~word~)", type: "font", default: "Instrument Serif" },
     { key: "accentWeight", label: "Accent weight", type: "number", default: 400, min: 100, max: 900, step: 100 },
     { key: "accentColor", label: "Accent colour", type: "color", default: "#ffffff" },
+    { key: "accentItalic", label: "Accent italic", type: "boolean", default: true },
+    { key: "lowercase", label: "All lowercase", type: "boolean", default: false },
     { key: "tracking", label: "Letter spacing (em)", type: "number", default: 0, min: -0.15, max: 0.3, step: 0.01 },
     { key: "fill", label: "Letter fill", type: "select", default: "solid", options: ["texture", "solid"] },
     { key: "fillColor2", label: "Texture second colour", type: "color", default: "#c48b96" },
@@ -58,7 +61,8 @@ const lines = String(p.text).split("|").map((line) =>
   line.trim().split(" ").filter(Boolean).map((raw) => {
     const emphasis = raw.length > 2 && raw.startsWith("*") && raw.endsWith("*")
     const accent = raw.length > 2 && raw.startsWith("~") && raw.endsWith("~")
-    return { text: emphasis || accent ? raw.slice(1, -1) : raw, emphasis, accent }
+    const text = emphasis || accent ? raw.slice(1, -1) : raw
+    return { text: p.lowercase ? text.toLowerCase() : text, emphasis, accent }
   })
 ).filter((line) => line.length > 0)
 if (lines.length === 0) return
@@ -89,9 +93,16 @@ lines.forEach((line, lineIndex) => {
 })
 
 const base = h * 0.55 * p.scale
+// A long key word at full emphasis size runs past the frame, so it grows less: full size up to 7
+// characters, half as much at 8–9, not at all from 10.
+const keyScale = (word) => {
+  if (!p.emphasisFit || word.text.length <= 7) return p.emphasisScale
+  if (word.text.length <= 9) return 1 + (p.emphasisScale - 1) / 2
+  return Math.min(1, p.emphasisScale)
+}
 const setFont = (word, size) => {
-  if (word.emphasis) ctx.font = M.font(p.emphasisFont, p.emphasisWeight, size * p.emphasisScale, p.emphasisItalic ? "italic" : "normal")
-  else if (word.accent) ctx.font = M.font(p.accentFont, p.accentWeight, size * p.emphasisScale, "italic")
+  if (word.emphasis) ctx.font = M.font(p.emphasisFont, p.emphasisWeight, size * keyScale(word), p.emphasisItalic ? "italic" : "normal")
+  else if (word.accent) ctx.font = M.font(p.accentFont, p.accentWeight, size * keyScale(word), p.accentItalic ? "italic" : "normal")
   else ctx.font = M.font(p.font, p.weight, size)
   ctx.letterSpacing = p.tracking * size + "px"
 }
@@ -237,6 +248,40 @@ rows.forEach((row) => {
  * The Modern looks: the same caption with its params set, so people pick them from the Elements
  * tab and add_captions picks them by `look`. Each one loads only the fonts it draws with.
  */
+
+/**
+ * Crisp: Montserrat ExtraBold, all lowercase and tight, white with the key word in a warm accent and
+ * a rare punch word (~word~) in a second one; a soft shadow and no box. The default for 9:16.
+ * The colours are a starting point: pick the two accents from the video.
+ */
+export const crispCaption: ElementDef = {
+  ...kineticCaption,
+  id: "crisp-caption",
+  name: "Modern · Crisp",
+  fonts: ["Montserrat"],
+  defaultParams: {
+    text: "this was *beautiful*",
+    font: "Montserrat",
+    weight: 800,
+    lowercase: true,
+    tracking: -0.01,
+    scale: 0.42,
+    color: "#ffffff",
+    emphasisFont: "Montserrat",
+    emphasisWeight: 800,
+    emphasisColor: "#ead9b0",
+    emphasisItalic: false,
+    emphasisScale: 1.3,
+    emphasisFit: true,
+    accentFont: "Montserrat",
+    accentWeight: 800,
+    accentColor: "#ccff00",
+    accentItalic: false,
+    highlight: "none",
+    animation: "pop",
+    shadow: true,
+  },
+}
 
 /** A faint lead-in line of the lesser words over the key word, set big on a red box. */
 export const leadInCaption: ElementDef = {

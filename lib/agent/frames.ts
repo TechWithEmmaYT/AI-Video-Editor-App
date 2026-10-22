@@ -52,6 +52,27 @@ export function onScreen(doc: Doc, frame: number) {
   return clips.map((clip) => `${clip.id} ${clip.type} "${clip.name}"`).join(" · ")
 }
 
+/**
+ * Where captions sit in a 9:16 video, as fractions of the canvas: 1080×1920 → x 64, y 1020, 952×400.
+ * Below the face and above the app's buttons and caption text at the bottom.
+ */
+export const CAPTION_SAFE_ZONE = { x: 64 / 1080, y: 1020 / 1920, width: 952 / 1080, height: 400 / 1920 }
+
+/** The caption safe zone on a w×h canvas, in pixels. */
+export function captionSafeBox(width: number, height: number) {
+  return {
+    x: Math.round(width * CAPTION_SAFE_ZONE.x),
+    y: Math.round(height * CAPTION_SAFE_ZONE.y),
+    width: Math.round(width * CAPTION_SAFE_ZONE.width),
+    height: Math.round(height * CAPTION_SAFE_ZONE.height),
+  }
+}
+
+/** Captions in a 9:16 video must stay inside these (fractions of the canvas), or the app's buttons cover them. */
+const CAPTION_LIMITS = { left: 0.05, right: 0.95, top: 0.18, bottom: 0.78 }
+
+const isCaption = (clip: Clip) => clip.type === "code" && !!clip.elementId?.endsWith("-caption")
+
 /** "0:03.2 (frame 96)" */
 export const frameLabel = (frame: number, fps: number) => `${formatTimestamp(frame / fps)} (frame ${frame})`
 
@@ -127,6 +148,15 @@ export function docChecks(doc: Doc, project: Canvas) {
     const fullFrame = left <= 2 && top <= 2 && right >= W - 2 && bottom >= H - 2
     if (!fullFrame && (left < -2 || top < -2 || right > W + 2 || bottom > H + 2)) {
       problems.push(`${at}: its box goes past the canvas edge, so part of it may be cut off.`)
+    } else if (
+      isCaption(clip) &&
+      project.format === "9:16" &&
+      (left < W * CAPTION_LIMITS.left || right > W * CAPTION_LIMITS.right || top < H * CAPTION_LIMITS.top || bottom > H * CAPTION_LIMITS.bottom)
+    ) {
+      const safe = captionSafeBox(W, H)
+      problems.push(
+        `${at}: the caption box is outside the caption safe zone, where the app's buttons or the face cover it. Use x ${safe.x}, y ${safe.y}, width ${safe.width}, height ${safe.height}.`
+      )
     } else if (clip.type === "text" && project.format === "9:16" && (cy < H * 0.18 || cy > H * 0.75)) {
       problems.push(`${at}: text sits outside the 9:16 safe zone (keep it between 18% and 75% down), where app buttons cover it.`)
     }
