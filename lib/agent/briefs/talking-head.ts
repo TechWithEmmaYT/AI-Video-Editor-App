@@ -53,7 +53,7 @@ export const REEL_REFERENCES = [
   'Search Pinterest for more: https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed, changing the `q=` words to what you need, e.g. "reel captions" or "talking head reel edit".',
 ]
 
-const SHARED_TOOLS = ["get_project", "get_media", "get_media_transcript", "add_captions", "add_media_from_url", "add_clip", "update_clip"]
+const SHARED_TOOLS = ["get_project", "get_media", "get_media_transcript", "add_captions", "add_media_from_url", "add_clip", "update_clip", "render_frames"]
 
 /** The rule for picking footage or a built card, written out for whichever kinds a style allows. */
 function brollKinds(kinds: TalkingHeadStyle["broll"]["kinds"]) {
@@ -116,7 +116,8 @@ ${brollKinds(broll.kinds)}
    - Mix full-screen and card framings. Never two cards in a row longer than 6 s.
    - **Every cutaway enters.** Set \`animateIn\` on the clip: \`"pop"\` or \`"scale"\` for cards, \`"rise"\` for text, \`"grow"\` for a card arriving out of a transition. Use \`animateInFrames: 6–10\`. Nothing appears with a hard cut except a return to the speaker.
 5. **Cut back to the speaker** between b-roll: show the speaker for at least 2 s between b-roll clips, ${style.hook}. B-roll covers at most ${broll.maxShare} of the video.
-${extras ? `${extras}\n` : ""}${checkStep}. **Check:** call \`get_project\` again. Make sure there are no gaps on the speaker track, no overlaps on the captions track, every b-roll clip has volume 0, and every caption's \`times\` has one number per word.
+${extras ? `${extras}\n` : ""}${checkStep}. **Check the doc:** call \`get_project\` again. Make sure there are no gaps on the speaker track, no overlaps on the captions track, every b-roll clip has volume 0, and every caption's \`times\` has one number per word.
+${checkStep + 1}. **Look, fix, repeat:** call \`render_frames\` (\`count: 12\` over the whole video) and look at every frame against your reference: captions readable, in the safe zone, not over the face; b-roll filling its box; nothing black. Fix what's wrong, render the same times again, and repeat until a round finds nothing (at most 5 rounds).
 
 ## Numbers
 

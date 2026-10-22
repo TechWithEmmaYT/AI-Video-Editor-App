@@ -58,3 +58,20 @@ export type RenderVideoMetadata = { step?: "rendering" | "uploading"; progress?:
 export type RenderVideoOutput = { mp4Url: string; imagekitFileId: string }
 
 export const isFinished = (status: ExportStatus) => status === "done" || status === "failed" || status === "cancelled"
+
+/** What the render-frames task needs: a snapshot of the doc and which frames to render (Claude's render_frames tool). */
+export type RenderFramesPayload = {
+  userId: string
+  projectId: string
+  width: number
+  height: number
+  fps: number
+  durationInFrames: number
+  doc: unknown
+  frames: number[]
+  /** Each frame's long side, in pixels. */
+  size: number
+}
+
+/** Each frame as a base64 JPEG, or why it couldn't be rendered. */
+export type RenderFramesOutput = { frames: { frame: number; jpeg: string | null; error: string | null }[] }

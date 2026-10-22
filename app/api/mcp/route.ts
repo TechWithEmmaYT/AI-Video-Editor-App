@@ -11,6 +11,9 @@ import { APP_NAME } from "@/lib/brand"
  * The tools are registered in lib/agent/tools.
  */
 
+/** render_frames waits for a render (up to 240 s). */
+export const maxDuration = 300
+
 const handler = createMcpHandler(registerAgentTools, {
   serverInfo: { name: APP_NAME, version: "0.1.0" },
   // Sent to Claude Code on connect: start with get_guide, look at videos before editing them.
