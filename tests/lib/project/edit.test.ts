@@ -113,6 +113,23 @@ describe("changeFormatOps", () => {
     expect(applyOps(next, inverse)).toEqual(state)
   })
 
+  it("brings a fitted video back to full screen after 9:16 → 16:9 → 1:1 → 9:16", () => {
+    // A phone video a little shorter than 9:16, fitted on drop: full width, not quite full height.
+    const video = imageClip({ id: "v", trackId: "t1", transform: { x: 0, y: 10, width: 1080, height: 1900, scale: 1, rotation: 0, opacity: 1 } })
+    let state = { ...project({ tracks: [{ id: "t1" }], clips: [video] }), format: "9:16" as const }
+    for (const format of ["16:9", "1:1", "9:16"] as const) state = applyOps(state, changeFormatOps(state, format)!) as typeof state
+    expect(state.doc.clips[0].transform).toMatchObject({ x: 0, y: 0, width: 1080, height: 1920 })
+  })
+
+  it("keeps a fitted video fitted, in its own shape, through every format", () => {
+    const video = imageClip({ id: "v", trackId: "t1", transform: { x: 0, y: 110, width: 1080, height: 1700, scale: 1, rotation: 0, opacity: 1 } })
+    let state = { ...project({ tracks: [{ id: "t1" }], clips: [video] }), format: "9:16" as const }
+    state = applyOps(state, changeFormatOps(state, "16:9")!) as typeof state
+    expect(state.doc.clips[0].transform).toMatchObject({ x: 617, y: 0, width: 686, height: 1080 })
+    state = applyOps(state, changeFormatOps(state, "9:16")!) as typeof state
+    expect(state.doc.clips[0].transform).toMatchObject({ x: 0, y: 110, width: 1080, height: 1700 })
+  })
+
   it("shrinks a box (and its text) that's wider than the new canvas", () => {
     const text = {
       ...CLIP_MOTION_DEFAULTS,
