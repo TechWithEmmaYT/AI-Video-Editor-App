@@ -19,7 +19,9 @@ export const AGENT_INSTRUCTIONS = [
   "Start every conversation by calling get_guide (once), then get_selection or get_project.",
   "Before editing anything that involves a video, call get_media on it to see it (and get_media_transcript to know what's said).",
   "Times in tools are seconds. Never put outside URLs in clips: bring files in with add_media_from_url first.",
-  "Edits appear in the user's open editor as you make them; make them in small steps and re-check with get_project.",
+  "Before you start a look, find references on Pinterest first (get_guide topic \"assets\").",
+  "Edits appear in the user's open editor as you make them; make them in small steps.",
+  "You can see your work: after each round of edits call render_frames, look at the frames, fix what's wrong and render again, until it looks right. Never call a video done without looking at it.",
 ].join(" ")
 
 export const GUIDE_TOPICS = ["overview", "project", "workflow", "code-clips", "elements", "briefs", "assets", "recipes"] as const
@@ -57,7 +59,9 @@ function overview(tools: string[]) {
 2. **Look before you edit:** \`get_media\` on any video you're working with (contact sheet), \`get_media_transcript\` for what's said.
 3. Times in tools are **seconds**. Positions and sizes are canvas pixels (top-left is 0,0).
 4. Never put outside URLs in clips: \`add_media_from_url\` first, then use its mediaId.
-5. Work in small steps; re-check with \`get_project\`. Your edits aren't in the user's undo history, so confirm big changes first.
+5. **References first:** before you design a look, search Pinterest for edits like the one asked for (\`get_guide({ topic: "assets" })\`) and match what you find.
+6. **Look at what you made:** after every round of edits call \`render_frames\` and look at the frames. Fix what's wrong, render again, and repeat until the frames are clean. Never say a video is done without looking at it.
+7. Work in small steps. Your edits aren't in the user's undo history, so confirm big changes first.
 
 ## Topics
 Call \`get_guide({ topic })\` for: ${GUIDE_TOPICS.filter((t) => t !== "overview").map((t) => `\`${t}\``).join(", ")}, or \`brief:<id>\` for a style.
@@ -88,12 +92,19 @@ ${FONTS.map((f) => `${f.family}${f.italics?.length ? " (+italic)" : ""}`).join("
 const workflow = () => `# Editing workflow
 
 1. **Orient:** \`get_selection\` → \`get_project\` (tracks, clips, ids, times).
-2. **See and hear:** \`list_media\`; \`get_media\` on videos (contact sheet with timestamps); \`get_media_transcript\` for speech (word timings when ImageKit made it).
-3. **Plan** against the timeline: which track, which seconds. Prefer a brief (\`get_guide({ topic: "briefs" })\`) when the request matches a style.
-4. **Edit** with \`add_clip\` / \`update_clip\` / \`delete_clip\` (seconds; \`track: "auto"\` picks a sensible track).
-5. **Check** with \`get_project\`: no unintended gaps or overlaps, b-roll muted under speech, text inside the safe zone.
+2. **See and hear:** \`list_media\`; \`get_media\` on videos (contact sheet with timestamps); \`get_media_transcript\` for speech (word timings when ImageKit made it). If the timeline already has clips, \`render_frames\` shows how it looks now.
+3. **Find references on Pinterest first.** Search for edits like the one asked for (see \`get_guide({ topic: "assets" })\`), open 2–3 good ones and note what they do: caption size and place, colours, how often it cuts, how cards enter. Match that.
+4. **Plan** against the timeline: which track, which seconds. Prefer a brief (\`get_guide({ topic: "briefs" })\`) when the request matches a style.
+5. **Edit** with \`add_clip\` / \`update_clip\` / \`delete_clip\` (seconds; \`track: "auto"\` picks a sensible track).
+6. **Look, fix, repeat.** This is a loop, not one check:
+   1. \`render_frames\` over what you changed (\`clipId\` for one clip, \`from\`/\`to\` for a stretch, or the default 8 over the whole video).
+   2. Look at every frame. Is the text readable, inside the safe zone, not cut off or covering a face? Is anything black, stretched, empty or overlapping by mistake? Does it look like your reference? Read the checks under the frames too.
+   3. Fix each problem with \`update_clip\` / \`add_clip\` / \`delete_clip\`.
+   4. \`render_frames\` again on the same times. Repeat until a round finds nothing to fix (stop after 5 rounds and tell the user what's left).
+   5. Finish with one pass over the whole video (\`count: 12\`), and \`detail: true\` on anything small you need to read.
+7. **Tell the user** what you made and what you checked.
 
-Tips: add a whole caption/b-roll pass one clip per call, in time order. For a clip's exact values, \`get_project\` includes the full JSON.`
+Tips: add a whole caption/b-roll pass one clip per call, in time order. For a clip's exact values, \`get_project\` includes the full JSON. \`render_frames\` shows the saved project, so call it after your edits have returned.`
 
 function codeClips() {
   return `# Code clips
@@ -146,13 +157,19 @@ const assets = () => `# Free assets
 
 Find files yourself with web search/fetch or a browser; no API keys or extra tools. Use **direct file URLs** (the file itself, not its web page), then \`add_media_from_url\`, then use the mediaId. **Never put outside URLs in clips.**
 
-- **Reference reels and shorts (to match a look, not to use as footage):** ${REEL_REFERENCES.join(" ")}
+## References: always Pinterest first
+
+Before you design any look (captions, cards, b-roll, pacing), look for references on Pinterest, for every kind of video: reels, shorts, ads, long-form, explainers. They're to match a look, never to use as footage.
+- Search: https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed, changing the \`q=\` words to what you need, e.g. "reel captions", "talking head reel edit", "youtube video editing style", "product ad video".
+- Open 2–3 strong pins and note what they do (caption size, place and colours, cut rhythm, how cards enter). Then compare your \`render_frames\` against them.
+- Only if Pinterest has nothing useful, use other sources.
+- ${REEL_REFERENCES[0]}
+
+## Files
 - **B-roll video & photos:** Pexels (free, no attribution needed), Pixabay (free; hotlinking isn't allowed, so always bring files in). Prefer **≤ 720p** video (smaller, faster).
 - **Sound effects & music:** Pixabay sound effects / music.
 - **Logos:** https://api.svgl.app (SVG; JSON list with file URLs). Add with \`add_media_from_url\`, or draw inline with \`M.svg(markup)\` in a code clip. Use a brand's logo only to show that brand.
-- **Avatars (placeholders):** https://i.pravatar.cc/256
-- **References & Inspiration edits: Search reels, longform on Pinterest for more: https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed, changing the 'q=' words to what you need, e.g. "reel captions" or "talking head reel edit".',
-`
+- **Avatars (placeholders):** https://i.pravatar.cc/256`
 
 const recipes = () => `# Recipes
 
