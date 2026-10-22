@@ -52,7 +52,7 @@ describe("docChecks", () => {
     const { doc } = project({
       tracks: [{ id: "a" }],
       clips: [
-        imageClip({ id: "i1", trackId: "a", from: 30, durationInFrames: 30 }),
+        imageClip({ id: "i1", trackId: "a", from: 30, durationInFrames: 270, transform: { x: 0, y: 0, width: 1080, height: 1920, scale: 1, rotation: 0, opacity: 1 } }),
         textClip({ id: "edge", trackId: "a", from: 60, durationInFrames: 30, transform: { x: 600, y: 800, width: 900, height: 200, scale: 1, rotation: 0, opacity: 1 } }),
         textClip({ id: "high", trackId: "a", from: 90, durationInFrames: 210, transform: { x: 90, y: 40, width: 900, height: 200, scale: 1, rotation: 0, opacity: 1 } }),
       ],
@@ -62,5 +62,15 @@ describe("docChecks", () => {
     expect(problems.some((line) => line.startsWith('edge text "Hook"') && line.includes("past the canvas edge"))).toBe(true)
     expect(problems.some((line) => line.startsWith('high text "Hook"') && line.includes("safe zone"))).toBe(true)
     expect(problems).toHaveLength(3)
+  })
+
+  it("finds a video shrunk inside the canvas with black around it", () => {
+    const { doc } = project({
+      tracks: [{ id: "a" }],
+      clips: [imageClip({ id: "small", trackId: "a", durationInFrames: 300, transform: { x: 0, y: 0, width: 1080, height: 1920, scale: 0.65, rotation: 0, opacity: 1 } })],
+    })
+    const problems = docChecks(doc, canvas)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('Black edges 0:00.0–0:10.0: nothing fills the whole canvas; small image "Still"')
   })
 })

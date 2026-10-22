@@ -43,7 +43,7 @@ export function registerFrameTools(server: McpServer) {
         "Use it after every round of edits to see your work, then fix what looks wrong and look again.",
         "Pick frames with `times` (seconds), or `from`/`to`/`count` for frames spread over a range (default: 8 over the whole video), or `clipId` for frames across one clip.",
         "`detail: true` renders up to 3 frames large, to read small text or check an edge.",
-        "Takes about 10–60 s. Also lists problems found in the doc (black gaps, boxes off the canvas, text outside the safe zone).",
+        "Takes about 10–60 s. Also lists problems found in the doc (black gaps, black edges, boxes off the canvas, text outside the safe zone).",
       ].join(" "),
       inputSchema: z.object({
         times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES).optional().describe("Exact moments, in seconds of the timeline."),
@@ -119,7 +119,7 @@ export function registerFrameTools(server: McpServer) {
           type: "text",
           text: problems.length
             ? `Checks found ${problems.length} problem${problems.length === 1 ? "" : "s"} in the doc:\n${problems.map((line) => `- ${line}`).join("\n")}`
-            : "Checks: no black gaps, nothing past the canvas edge.",
+            : "Checks: no black gaps or edges, nothing past the canvas edge.",
         })
         content.push({
           type: "text",

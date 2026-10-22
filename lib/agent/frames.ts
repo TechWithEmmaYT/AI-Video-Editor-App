@@ -58,7 +58,7 @@ export const frameLabel = (frame: number, fps: number) => `${formatTimestamp(fra
 type Canvas = { width: number; height: number; fps: number; durationInFrames: number; format: string }
 
 /**
- * Problems a look at the doc can find on its own: black gaps, boxes past the canvas edge, text
+ * Problems a look at the doc can find on its own: black gaps, black edges, boxes past the canvas edge, text
  * outside the safe zone. Each is one line with the clip id and time, so Claude can fix it.
  */
 export function docChecks(doc: Doc, project: Canvas) {
@@ -74,6 +74,28 @@ export function docChecks(doc: Doc, project: Canvas) {
     covered = Math.max(covered, clip.from + clip.durationInFrames)
   }
   if (visual.length && covered < project.durationInFrames) problems.push(`Black screen ${time(covered)}–${time(project.durationInFrames)} at the end.`)
+
+  // Black edges: something is on screen, but nothing fills the canvas (a video shrunk into a box).
+  const fills = (clip: Clip) => {
+    if (clip.type === "text" || clip.transform.rotation % 360 !== 0) return false
+    const { x, y, width, height, scale } = clip.transform
+    const cx = x + width / 2
+    const cy = y + height / 2
+    return cx - (width * scale) / 2 <= 2 && cy - (height * scale) / 2 <= 2 && cx + (width * scale) / 2 >= W - 2 && cy + (height * scale) / 2 >= H - 2
+  }
+  let lastEdge = -1
+  for (const clip of visual) {
+    if (clip.from <= lastEdge) continue
+    const onScreenNow = visual.filter((other) => covers(other, clip.from))
+    if (onScreenNow.some(fills)) continue
+    const shrunk = onScreenNow.find((other) => other.type !== "text")
+    if (!shrunk) continue
+    const end = shrunk.from + shrunk.durationInFrames
+    problems.push(
+      `Black edges ${time(clip.from)}–${time(end)}: nothing fills the whole canvas; ${shrunk.id} ${shrunk.type} "${shrunk.name}" is smaller than it (box ${Math.round(shrunk.transform.width * shrunk.transform.scale)}×${Math.round(shrunk.transform.height * shrunk.transform.scale)}). If that isn't on purpose (a card on a backdrop), set its box to the full canvas with scale 1.`
+    )
+    lastEdge = end - 1
+  }
 
   for (const clip of doc.clips) {
     if (clip.type !== "text" && clip.type !== "code") continue
