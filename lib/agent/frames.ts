@@ -58,7 +58,7 @@ export const frameLabel = (frame: number, fps: number) => `${formatTimestamp(fra
 type Canvas = { width: number; height: number; fps: number; durationInFrames: number; format: string }
 
 /**
- * Problems a look at the doc can find on its own: black gaps, black edges, boxes past the canvas edge, text
+ * Problems a look at the doc can find on its own: black gaps, black edges, replayed footage, boxes past the canvas edge, text
  * outside the safe zone. Each is one line with the clip id and time, so Claude can fix it.
  */
 export function docChecks(doc: Doc, project: Canvas) {
@@ -95,6 +95,22 @@ export function docChecks(doc: Doc, project: Canvas) {
       `Black edges ${time(clip.from)}–${time(end)}: nothing fills the whole canvas; ${shrunk.id} ${shrunk.type} "${shrunk.name}" is smaller than it (box ${Math.round(shrunk.transform.width * shrunk.transform.scale)}×${Math.round(shrunk.transform.height * shrunk.transform.scale)}). If that isn't on purpose (a card on a backdrop), set its box to the full canvas with scale 1.`
     )
     lastEdge = end - 1
+  }
+
+  // Repeats: a clip that picks up right after another of the same file but plays part of it again
+  // (usually a re-added speaker clip whose trimStart was left at 0), so speech is heard twice.
+  for (const clip of doc.clips) {
+    if (clip.type !== "video" && clip.type !== "audio") continue
+    const before = doc.clips.find(
+      (other) => other.trackId === clip.trackId && other.type === clip.type && other.mediaId === clip.mediaId && other.from + other.durationInFrames === clip.from
+    )
+    if (!before || (before.type !== "video" && before.type !== "audio")) continue
+    const continues = before.trimStartFrames + before.durationInFrames
+    if (clip.trimStartFrames < continues) {
+      problems.push(
+        `${clip.id} ${clip.type} "${clip.name}" at ${time(clip.from)} replays its source from ${time(clip.trimStartFrames)}, but the clip before it already played up to ${time(continues)}: that part is seen and heard twice. To carry on, set its trimStart to ${(continues / fps).toFixed(2)} s.`
+      )
+    }
   }
 
   for (const clip of doc.clips) {

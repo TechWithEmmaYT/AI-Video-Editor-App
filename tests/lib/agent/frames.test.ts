@@ -73,4 +73,21 @@ describe("docChecks", () => {
     expect(problems).toHaveLength(1)
     expect(problems[0]).toContain('Black edges 0:00.0–0:10.0: nothing fills the whole canvas; small image "Still"')
   })
+
+  it("finds a speaker clip that replays what the clip before it already played", () => {
+    const { doc } = project({ tracks: [{ id: "a" }], clips: [] })
+    const speaker = (id: string, from: number, durationInFrames: number, trimStartFrames: number) => ({
+      ...imageClip({ id, trackId: "a", from, durationInFrames, transform: { x: 0, y: 0, width: 1080, height: 1920, scale: 1, rotation: 0, opacity: 1 } }),
+      type: "video" as const,
+      name: "Speaker",
+      trimStartFrames,
+      sourceDurationInFrames: 1380,
+      volume: 1,
+    })
+    doc.clips = [speaker("s1", 0, 99, 0), speaker("s2", 99, 63, 99), speaker("s3", 162, 636, 0), speaker("s4", 798, 117, 798)] as typeof doc.clips
+    const problems = docChecks(doc, { ...canvas, durationInFrames: 915 })
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('s3 video "Speaker" at 0:05.4 replays its source from 0:00.0')
+    expect(problems[0]).toContain("set its trimStart to 5.40 s")
+  })
 })
