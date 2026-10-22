@@ -93,7 +93,7 @@ const workflow = () => `# Editing workflow
 
 1. **Orient:** \`get_selection\` → \`get_project\` (tracks, clips, ids, times).
 2. **See and hear:** \`list_media\`; \`get_media\` on videos (contact sheet with timestamps); \`get_media_transcript\` for speech (word timings when ImageKit made it). If the timeline already has clips, \`render_frames\` shows how it looks now.
-3. **Find references on Pinterest first.** Search for edits like the one asked for (see \`get_guide({ topic: "assets" })\`), open 2–3 good ones and note what they do: caption size and place, colours, how often it cuts, how cards enter. Match that.
+3. **Find references on Pinterest first, before you plan.** Search for edits like the one asked for (see \`get_guide({ topic: "assets" })\`), open 2–3 good ones and note what they do: caption size and place, colours, how often it cuts, how cards enter. Match that.
 4. **Plan** against the timeline: which track, which seconds. Prefer a brief (\`get_guide({ topic: "briefs" })\`) when the request matches a style.
 5. **Edit** with \`add_clip\` / \`update_clip\` / \`delete_clip\` (seconds; \`track: "auto"\` picks a sensible track).
 6. **Look, fix, repeat.** This is a loop, not one check:
@@ -163,6 +163,7 @@ Before you design any look (captions, cards, b-roll, pacing), look for reference
 - Search: https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed, changing the \`q=\` words to what you need, e.g. "reel captions", "talking head reel edit", "youtube video editing style", "product ad video".
 - Open 2–3 strong pins and note what they do (caption size, place and colours, cut rhythm, how cards enter). Then compare your \`render_frames\` against them.
 - Only if Pinterest has nothing useful, use other sources.
+- If Pinterest asks you to sign in, use a browser where the user is already signed in, or ask the user to sign in there. Never ask for or keep a password.
 - ${REEL_REFERENCES[0]}
 
 ## Files
