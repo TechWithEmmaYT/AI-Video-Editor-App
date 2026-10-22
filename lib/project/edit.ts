@@ -1,5 +1,5 @@
 import type { Op, ProjectData } from "@/lib/project/ops"
-import { isRangeFree } from "@/lib/project/placement"
+import { fitBox, isRangeFree } from "@/lib/project/placement"
 import { FORMATS } from "@/lib/project/formats"
 import type { Clip } from "@/lib/project/schema"
 import type { ProjectFormat } from "@/types/project"
@@ -78,9 +78,14 @@ export function replaceSourceOps(clip: Clip, media: SourceMedia, fps: number): O
   return [{ type: "updateClip", clipId: clip.id, patch }]
 }
 
+/** Pixels a box may miss a canvas edge by and still count as touching it. */
+const EDGE = 2
+
 /**
  * Switches the canvas format and refits every clip, as one undoable batch:
  * - a box that filled the old canvas fills the new one;
+ * - a video or image fitted to the old canvas (edge to edge on one side) is fitted to the new one,
+ *   so 9:16 → 16:9 → 9:16 brings a full-screen video back to full screen instead of leaving it small;
  * - any other box keeps its size (every format's short side is 1080) with its centre at the
  *   same relative spot, shrinking (text size included) only if it no longer fits.
  * Null when the format doesn't change.
@@ -93,10 +98,18 @@ export function changeFormatOps(state: ProjectData, format: ProjectFormat): Op[]
 
   for (const clip of state.doc.clips) {
     const t = clip.transform
-    const filled = t.x <= 0 && t.y <= 0 && t.x + t.width >= from.width && t.y + t.height >= from.height
+    // A couple of pixels' slack: fitted boxes are rounded.
+    const spansWidth = t.x <= EDGE && t.x + t.width >= from.width - EDGE
+    const spansHeight = t.y <= EDGE && t.y + t.height >= from.height - EDGE
+    const isMedia = clip.type === "video" || clip.type === "image"
     let patch: Record<string, unknown>
-    if (filled) {
+    if (spansWidth && spansHeight) {
       patch = { transform: { x: 0, y: 0, width: to.width, height: to.height } }
+    } else if (isMedia && (spansWidth || spansHeight)) {
+      const box = fitBox(t.width, t.height, to.width, to.height)
+      // Close enough to the whole canvas (the source is the canvas's shape): fill it, no hairline edges.
+      const fills = box.width >= to.width * 0.98 && box.height >= to.height * 0.98
+      patch = { transform: fills ? { x: 0, y: 0, width: to.width, height: to.height } : { x: box.x, y: box.y, width: box.width, height: box.height } }
     } else {
       const k = Math.min(1, to.width / t.width, to.height / t.height)
       const width = Math.max(1, Math.round(t.width * k))
