@@ -104,14 +104,14 @@ describe("Modern caption looks", () => {
 })
 
 describe("Modern · Crisp", () => {
-  it("is lowercase Montserrat 800, with the key word in the warm accent and the punch word in lime", () => {
+  it("is lowercase Montserrat 700, with the key word in the warm accent and the punch word in lime", () => {
     const words = drawnAt(2, 0.9, { text: "This is *Huge* ~now~", times: "0, 0.2, 0.4, 0.6" }, crispCaption)
     expect(words.map((w) => w.text)).toEqual(["this", "is", "huge", "now"])
     expect(words[0]).toMatchObject({ color: "#ffffff" })
-    expect(words[0].font).toMatch(/^normal 800 .*Montserrat/)
+    expect(words[0].font).toMatch(/^normal 700 .*Montserrat/)
     expect(words[2].color).toBe("#ead9b0")
     expect(words[3].color).toBe("#ccff00")
-    expect(words[3].font).toMatch(/^normal 800 /)
+    expect(words[3].font).toMatch(/^normal 700 /)
   })
 
   it("grows a long key word less, so it stays inside the frame", () => {
@@ -122,5 +122,13 @@ describe("Modern · Crisp", () => {
     expect(at("short")).toBeCloseTo(1.3)
     expect(at("complete")).toBeCloseTo(1.15)
     expect(at("opportunity.")).toBeCloseTo(1)
+  })
+
+  it("draws a _serif_ word in lime Playfair Display italic, a little larger", () => {
+    const words = drawnAt(2, 0.9, { text: "the _future_ is here", times: "0, 0.2, 0.4, 0.6" }, crispCaption)
+    expect(words[1].text).toBe("future")
+    expect(words[1].color).toBe("#ccff00")
+    expect(words[1].font).toMatch(/^italic 700 .*Playfair Display/)
+    expect(sizeOf(words[1].font) / sizeOf(words[0].font)).toBeCloseTo(1.35)
   })
 })

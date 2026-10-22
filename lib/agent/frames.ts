@@ -79,8 +79,8 @@ export const frameLabel = (frame: number, fps: number) => `${formatTimestamp(fra
 type Canvas = { width: number; height: number; fps: number; durationInFrames: number; format: string }
 
 /**
- * Problems a look at the doc can find on its own: black gaps, black edges, replayed footage, boxes past the canvas edge, text
- * outside the safe zone. Each is one line with the clip id and time, so Claude can fix it.
+ * Problems a look at the doc can find on its own: black gaps, black edges, replayed footage, captions hidden under
+ * full-screen footage, b-roll that isn't silent, boxes past the canvas edge, text outside the safe zone. Each is one line with the clip id and time, so Claude can fix it.
  */
 export function docChecks(doc: Doc, project: Canvas) {
   const problems: string[] = []
@@ -132,6 +132,30 @@ export function docChecks(doc: Doc, project: Canvas) {
         `${clip.id} ${clip.type} "${clip.name}" at ${time(clip.from)} replays its source from ${time(clip.trimStartFrames)}, but the clip before it already played up to ${time(continues)}: that part is seen and heard twice. To carry on, set its trimStart to ${(continues / fps).toFixed(2)} s.`
       )
     }
+  }
+
+  const trackIndex = new Map(doc.tracks.map((track, index) => [track.id, index]))
+  const overlap = (a: Clip, b: Clip) => a.from < b.from + b.durationInFrames && b.from < a.from + a.durationInFrames
+
+  // Hidden captions: full-screen footage on a track above a caption covers it (top draws over bottom).
+  for (const caption of doc.clips.filter(isCaption)) {
+    const cover = doc.clips.find(
+      (other) => (other.type === "video" || other.type === "image") && fills(other) && trackIndex.get(other.trackId)! < trackIndex.get(caption.trackId)! && overlap(other, caption)
+    )
+    if (!cover) continue
+    problems.push(
+      `${caption.id} code "${caption.name}" at ${time(caption.from)} is hidden behind ${cover.id} ${cover.type} "${cover.name}", which fills the screen on a track above it. Move the caption to a track above that footage (update_clip trackId, or a new track), or make the footage a card in the upper half.`
+    )
+  }
+
+  // Two voices: a video on top of another that still plays its own sound (b-roll left above volume 0).
+  for (const clip of doc.clips) {
+    if (clip.type !== "video" || clip.volume === 0) continue
+    const under = doc.clips.find(
+      (other) => other.type === "video" && other.id !== clip.id && other.volume > 0 && trackIndex.get(other.trackId)! > trackIndex.get(clip.trackId)! && overlap(other, clip)
+    )
+    if (!under) continue
+    problems.push(`${clip.id} video "${clip.name}" at ${time(clip.from)} plays its own sound over ${under.id} video "${under.name}". B-roll goes at volume 0, so only the speaker is heard.`)
   }
 
   for (const clip of doc.clips) {

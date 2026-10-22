@@ -46,6 +46,10 @@ export const kineticCaption: ElementDef = {
     { key: "accentWeight", label: "Accent weight", type: "number", default: 400, min: 100, max: 900, step: 100 },
     { key: "accentColor", label: "Accent colour", type: "color", default: "#ffffff" },
     { key: "accentItalic", label: "Accent italic", type: "boolean", default: true },
+    { key: "serifFont", label: "Serif accent font (_word_)", type: "font", default: "Playfair Display" },
+    { key: "serifWeight", label: "Serif accent weight", type: "number", default: 700, min: 100, max: 900, step: 100 },
+    { key: "serifColor", label: "Serif accent colour", type: "color", default: "#ffffff" },
+    { key: "serifScale", label: "Serif accent size", type: "number", default: 1.35, min: 0.5, max: 2, step: 0.05 },
     { key: "lowercase", label: "All lowercase", type: "boolean", default: false },
     { key: "tracking", label: "Letter spacing (em)", type: "number", default: 0, min: -0.15, max: 0.3, step: 0.01 },
     { key: "fill", label: "Letter fill", type: "select", default: "solid", options: ["texture", "solid"] },
@@ -55,14 +59,16 @@ export const kineticCaption: ElementDef = {
   ],
   defaultParams: {},
   createdBy: "builtin",
-  code: `// Words appear one by one at their own time. "|" starts a new line; *word* marks emphasis, ~word~ an accent.
+  code: `// Words appear one by one at their own time. "|" starts a new line; *word* marks emphasis, ~word~ an accent,
+// _word_ a serif italic accent.
 // times = each word's start in seconds from the clip's start (flat, across every line).
 const lines = String(p.text).split("|").map((line) =>
   line.trim().split(" ").filter(Boolean).map((raw) => {
     const emphasis = raw.length > 2 && raw.startsWith("*") && raw.endsWith("*")
     const accent = raw.length > 2 && raw.startsWith("~") && raw.endsWith("~")
-    const text = emphasis || accent ? raw.slice(1, -1) : raw
-    return { text: p.lowercase ? text.toLowerCase() : text, emphasis, accent }
+    const serif = raw.length > 2 && raw.startsWith("_") && raw.endsWith("_")
+    const text = emphasis || accent || serif ? raw.slice(1, -1) : raw
+    return { text: p.lowercase ? text.toLowerCase() : text, emphasis, accent, serif }
   })
 ).filter((line) => line.length > 0)
 if (lines.length === 0) return
@@ -103,6 +109,8 @@ const keyScale = (word) => {
 const setFont = (word, size) => {
   if (word.emphasis) ctx.font = M.font(p.emphasisFont, p.emphasisWeight, size * keyScale(word), p.emphasisItalic ? "italic" : "normal")
   else if (word.accent) ctx.font = M.font(p.accentFont, p.accentWeight, size * keyScale(word), p.accentItalic ? "italic" : "normal")
+  // The serif is optically smaller than the sans beside it, so it takes its own, larger size.
+  else if (word.serif) ctx.font = M.font(p.serifFont, p.serifWeight, size * p.serifScale, "italic")
   else ctx.font = M.font(p.font, p.weight, size)
   ctx.letterSpacing = p.tracking * size + "px"
 }
@@ -135,17 +143,23 @@ const heightOf = (rows) => {
   return total
 }
 
-// Shrink until the wrapped rows fit the box's height, rather than squeezing one long line to nothing.
+const widestOf = (rows) => {
+  let widest = 0
+  for (const row of rows) widest = Math.max(widest, row.width)
+  return widest
+}
+
+// Shrink until the wrapped rows fit the box, rather than squeezing one long line to nothing. A single
+// word wider than the box can't wrap, so it shrinks too instead of being cut off at the frame edge.
 let size = base
 let rows = layout(size)
-while (heightOf(rows) > h && size > base * 0.3) {
+while ((heightOf(rows) > h || widestOf(rows) > w) && size > base * 0.3) {
   size *= 0.9
   rows = layout(size)
 }
 // "Fill the width": grow or shrink so the widest row spans the box, as long as the rows still fit its height.
 if (p.fitWidth) {
-  let widest = 0
-  for (const row of rows) widest = Math.max(widest, row.width)
+  const widest = widestOf(rows)
   if (widest > 0) {
     size = Math.min((size * w * 0.92) / widest, (size * h) / heightOf(rows))
     rows = layout(size)
@@ -231,6 +245,7 @@ rows.forEach((row) => {
     if (p.highlightHold && word.emphasis && p.highlight === "box") ctx.fillStyle = "#ffffff"
     else if (word.emphasis) ctx.fillStyle = p.emphasisColor
     else if (word.accent) ctx.fillStyle = p.accentColor
+    else if (word.serif) ctx.fillStyle = p.serifColor
     else if (p.fill === "texture") {
       // A mottled wash between the two colours, different on every word but the same every frame.
       const wash = ctx.createLinearGradient(-width / 2, -rowSize * 0.8, width / 2, rowSize * 0.1)
@@ -250,33 +265,39 @@ rows.forEach((row) => {
  */
 
 /**
- * Crisp: Montserrat ExtraBold, all lowercase and tight, white with the key word in a warm accent and
- * a rare punch word (~word~) in a second one; a soft shadow and no box. The default for 9:16.
+ * Crisp: Montserrat Bold, all lowercase and a little tight, white with the key word in a warm accent,
+ * a rare punch word (~word~) in a second one and, for the 3–4 words that carry the idea, a Playfair
+ * italic (_word_); a soft shadow and no box. The default for 9:16.
  * The colours are a starting point: pick the two accents from the video.
  */
 export const crispCaption: ElementDef = {
   ...kineticCaption,
   id: "crisp-caption",
   name: "Modern · Crisp",
-  fonts: ["Montserrat"],
+  fonts: ["Montserrat", "Playfair Display"],
   defaultParams: {
     text: "this was *beautiful*",
     font: "Montserrat",
-    weight: 800,
+    weight: 700,
     lowercase: true,
-    tracking: -0.01,
+    // -0.01 makes long words collide at full size; 0 reads loose.
+    tracking: -0.004,
     scale: 0.42,
     color: "#ffffff",
     emphasisFont: "Montserrat",
-    emphasisWeight: 800,
+    emphasisWeight: 700,
     emphasisColor: "#ead9b0",
     emphasisItalic: false,
     emphasisScale: 1.3,
     emphasisFit: true,
     accentFont: "Montserrat",
-    accentWeight: 800,
+    accentWeight: 700,
     accentColor: "#ccff00",
     accentItalic: false,
+    serifFont: "Playfair Display",
+    serifWeight: 700,
+    serifColor: "#ccff00",
+    serifScale: 1.35,
     highlight: "none",
     animation: "pop",
     shadow: true,

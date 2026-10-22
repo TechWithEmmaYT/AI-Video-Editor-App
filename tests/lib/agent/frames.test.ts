@@ -90,4 +90,28 @@ describe("docChecks", () => {
     expect(problems[0]).toContain('s3 video "Speaker" at 0:05.4 replays its source from 0:00.0')
     expect(problems[0]).toContain("set its trimStart to 5.40 s")
   })
+
+  it("finds a caption hidden behind full-screen b-roll, and b-roll that isn't silent", () => {
+    const full = { x: 0, y: 0, width: 1080, height: 1920, scale: 1, rotation: 0, opacity: 1 }
+    const video = (id: string, trackId: string, from: number, durationInFrames: number, volume: number) => ({
+      ...imageClip({ id, trackId, from, durationInFrames, transform: full }),
+      type: "video" as const,
+      name: id,
+      trimStartFrames: 0,
+      sourceDurationInFrames: 900,
+      volume,
+    })
+    const caption = {
+      ...imageClip({ id: "cap", trackId: "captions", from: 60, durationInFrames: 30, transform: { x: 64, y: 1020, width: 952, height: 400, scale: 1, rotation: 0, opacity: 1 } }),
+      type: "code" as const,
+      name: "Modern · Crisp",
+      elementId: "crisp-caption",
+    }
+    const { doc } = project({ tracks: [{ id: "broll" }, { id: "captions" }, { id: "speaker" }], clips: [] })
+    doc.clips = [video("speaker", "speaker", 0, 300, 1), video("broll", "broll", 50, 60, 0.4), caption] as typeof doc.clips
+    const problems = docChecks(doc, canvas)
+    expect(problems).toHaveLength(2)
+    expect(problems[0]).toContain('cap code "Modern · Crisp" at 0:02.0 is hidden behind broll video "broll"')
+    expect(problems[1]).toContain('broll video "broll" at 0:01.6 plays its own sound over speaker video "speaker"')
+  })
 })

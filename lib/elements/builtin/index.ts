@@ -1,6 +1,6 @@
-import { circleReveal, shapeGrow, wipe } from "@/lib/elements/builtin/transitions"
+import { circleReveal, shapeGrow, shutterCut, shutterOpen, wipe } from "@/lib/elements/builtin/transitions"
 import { arrowPointer, badgePop, highlightBox } from "@/lib/elements/builtin/callouts"
-import { checklistCard, quoteCard, statCard } from "@/lib/elements/builtin/cards"
+import { checklistCard, darkListCard, quoteCard, statCard } from "@/lib/elements/builtin/cards"
 import { accentCaption, crispCaption, heavyCaption, kineticCaption, leadInCaption } from "@/lib/elements/builtin/captions"
 import { dotGrid, gradientMesh, noiseWaves, solidColour } from "@/lib/elements/builtin/backgrounds"
 import { logoSpin, svgLogoReveal } from "@/lib/elements/builtin/logos"
@@ -26,12 +26,15 @@ export const BUILTIN_ELEMENTS: ElementDef[] = [
   dotGrid,
   noiseWaves,
   solidColour,
+  shutterOpen,
+  shutterCut,
   wipe,
   shapeGrow,
   circleReveal,
   arrowPointer,
   highlightBox,
   badgePop,
+  darkListCard,
   checklistCard,
   statCard,
   quoteCard,

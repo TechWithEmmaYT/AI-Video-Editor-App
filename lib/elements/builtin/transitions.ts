@@ -87,3 +87,73 @@ ctx.beginPath()
 ctx.roundRect((w - cw) / 2, (h - ch) / 2, cw, ch, p.radius * (1 - k * 0.7))
 ctx.fill()`,
 }
+
+const SHUTTER_PARAMS: ElementDef["paramSchema"] = [
+  { key: "color", label: "Blade colour", type: "color", default: "#000000" },
+  { key: "accent", label: "Edge line colour", type: "color", default: "#ccff00" },
+  { key: "flashColor", label: "Flash colour", type: "color", default: "#ffffff" },
+  { key: "flashOpacity", label: "Flash strength", type: "number", default: 0.45, min: 0, max: 1, step: 0.05 },
+]
+
+/** Opens a reel at 0:00: two blades start shut and snap apart, with one bright blink. */
+export const shutterOpen: ElementDef = {
+  id: "shutter-open",
+  name: "Shutter Open",
+  category: "transitions",
+  layout: "full",
+  defaultDurationInFrames: 14,
+  fonts: [],
+  paramSchema: SHUTTER_PARAMS,
+  defaultParams: {},
+  createdBy: "builtin",
+  code: `const k = 1 - M.ease.outCubic(M.clamp(u / 0.8))
+const half = (h / 2) * k
+ctx.fillStyle = p.color
+ctx.fillRect(0, 0, w, half)
+ctx.fillRect(0, h - half, w, half)
+if (half > 1) {
+  const lw = Math.max(2, h * 0.0035)
+  ctx.fillStyle = p.accent
+  ctx.fillRect(0, half - lw, w, lw)
+  ctx.fillRect(0, h - half, w, lw)
+}
+const flash = 1 - M.clamp(u / 0.12)
+if (flash > 0) {
+  ctx.fillStyle = M.alpha(p.flashColor, M.ease.outCubic(flash) * p.flashOpacity)
+  ctx.fillRect(0, 0, w, h)
+}`,
+}
+
+/**
+ * Hides a cut: the blades slam shut at the midpoint, flash, and snap open. Start it 0.18 s before
+ * the cut so it is fully shut on the cut itself.
+ */
+export const shutterCut: ElementDef = {
+  id: "shutter-cut",
+  name: "Shutter Cut",
+  category: "transitions",
+  layout: "full",
+  defaultDurationInFrames: 11,
+  fonts: [],
+  paramSchema: SHUTTER_PARAMS,
+  defaultParams: {},
+  createdBy: "builtin",
+  code: `const close = M.clamp(u / 0.5)
+const open = M.clamp((u - 0.5) / 0.5)
+const k = u < 0.5 ? M.ease.inCubic(close) : 1 - M.ease.outCubic(open)
+const half = (h / 2) * k
+ctx.fillStyle = p.color
+ctx.fillRect(0, 0, w, half)
+ctx.fillRect(0, h - half, w, half)
+if (half > 1) {
+  const lw = Math.max(2, h * 0.0035)
+  ctx.fillStyle = p.accent
+  ctx.fillRect(0, half - lw, w, lw)
+  ctx.fillRect(0, h - half, w, lw)
+}
+const flash = 1 - M.clamp(Math.abs(u - 0.5) / 0.14)
+if (flash > 0) {
+  ctx.fillStyle = M.alpha(p.flashColor, M.ease.outCubic(flash) * p.flashOpacity)
+  ctx.fillRect(0, 0, w, h)
+}`,
+}

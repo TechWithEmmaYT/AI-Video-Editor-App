@@ -43,6 +43,8 @@ export type TalkingHeadStyle = {
   extras: string[]
   /** Extra built-in elements the extras use. */
   extraElements: string[]
+  /** Extra tools the extras use. */
+  extraTools?: string[]
   /** Where to find reference videos of this kind, one line each. */
   references?: string[]
 }
@@ -81,7 +83,7 @@ export function talkingHeadBrief(style: TalkingHeadStyle): Brief {
     summary: style.summary,
     formats: [style.format],
     elements: [captionId, "solid-colour", ...(style.broll.kinds.includes("graphic") ? ["checklist-card", "stat-card", "quote-card"] : []), ...style.extraElements],
-    tools: SHARED_TOOLS,
+    tools: [...SHARED_TOOLS, ...(style.extraTools ?? [])],
     body: `# ${style.name}
 
 **Use for:** ${style.useFor}
@@ -117,7 +119,7 @@ ${brollKinds(broll.kinds)}
    - **Every cutaway enters.** Set \`animateIn\` on the clip: \`"pop"\` or \`"scale"\` for cards, \`"rise"\` for text, \`"grow"\` for a card arriving out of a transition. Use \`animateInFrames: 6–10\`. Nothing appears with a hard cut except a return to the speaker.
 5. **Cut back to the speaker** between b-roll: show the speaker for at least 2 s between b-roll clips, ${style.hook}. B-roll covers at most ${broll.maxShare} of the video.
 ${extras ? `${extras}\n` : ""}${checkStep}. **Check the doc:** call \`get_project\` again. Make sure there are no gaps on the speaker track, no overlaps on the captions track, every b-roll clip has volume 0, and every caption's \`times\` has one number per word.
-${checkStep + 1}. **Look, fix, repeat:** call \`render_frames\` (\`count: 12\` over the whole video) and look at every frame against your reference: captions readable, in the safe zone, not over the face; b-roll filling its box; nothing black. Fix what's wrong, render the same times again, and repeat until a round finds nothing (at most 5 rounds).
+${checkStep + 1}. **Look, fix, repeat:** call \`render_frames\` (\`count: 12\` over the whole video) and look at every frame against your reference: captions readable, in the safe zone, not over the face, never hidden behind full-screen b-roll; the longest key word not cut off at the frame edge; b-roll filling its box; nothing black. Don't call it done before you've looked. Fix what's wrong, render the same times again, and repeat until a round finds nothing (at most 5 rounds).
 
 ## Numbers
 

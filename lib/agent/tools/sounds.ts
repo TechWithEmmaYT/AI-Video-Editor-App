@@ -7,7 +7,7 @@ import type { McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod"
 
 import { applyAgentEdit } from "@/lib/agent/apply"
-import { addClipOps } from "@/lib/agent/clip-spec"
+import { addClipOps, trackChoice } from "@/lib/agent/clip-spec"
 import { AgentError, agentUserId, handled, text } from "@/lib/agent/context"
 import { uploadBytes } from "@/lib/agent/imagekit-upload"
 import { resolveProject } from "@/lib/agent/resolve"
@@ -27,6 +27,9 @@ const volume = z.number().min(0).max(2).default(0.3).describe("0–2. Effects ar
 
 type Project = Awaited<ReturnType<typeof resolveProject>>
 
+/** Where a sound goes: its start, and optionally a slice of the file and a track. */
+type Placement = { at: number; volume: number; trimStart?: number; duration?: number; track?: string }
+
 /** The file's type from its first bytes: a WAV or an MP3, or null. */
 function soundType(bytes: Buffer) {
   if (bytes.subarray(0, 4).toString("latin1") === "RIFF" && bytes.subarray(8, 12).toString("latin1") === "WAVE") return "wav"
@@ -43,22 +46,22 @@ async function addSound(userId: string, project: Project, bytes: Buffer, name: s
   return created.id
 }
 
-/** Puts an audio media file on the timeline (the bottom audio track) and says where. */
-async function placeSound(userId: string, project: Project, mediaId: string, seconds: number, level: number) {
+/** Puts an audio media file on the timeline (the bottom audio track unless told otherwise) and says where. */
+async function placeSound(userId: string, project: Project, mediaId: string, place: Placement) {
   const media = await getUserMedia(userId, mediaId)
   if (!media) throw new AgentError("The sound was stored but can't be found. Try again.")
   let added = ""
   const result = await applyAgentEdit(userId, project.id, (state) => {
     const { ops, clipId } = addClipOps(
       state,
-      { kind: "media", mediaId, at: seconds, volume: level, track: "auto" },
+      { kind: "media", mediaId, at: place.at, volume: place.volume, trimStart: place.trimStart, duration: place.duration, track: place.track ?? "auto" },
       { width: project.width, height: project.height, newId: () => crypto.randomUUID(), media }
     )
     added = clipId
     return ops
   })
   const clip = result.data.doc.clips.find((c) => c.id === added)!
-  return `audio clip ${clip.id} "${clip.name}" at ${formatTimestamp(clip.from / project.fps)}–${formatTimestamp((clip.from + clip.durationInFrames) / project.fps)}, volume ${level}`
+  return `audio clip ${clip.id} "${clip.name}" at ${formatTimestamp(clip.from / project.fps)}–${formatTimestamp((clip.from + clip.durationInFrames) / project.fps)} on track ${clip.trackId}, volume ${place.volume}`
 }
 
 export function registerSoundTools(server: McpServer) {
@@ -86,10 +89,22 @@ export function registerSoundTools(server: McpServer) {
     {
       title: "Add a sound effect",
       description:
-        "Puts a built-in sound effect (an id from list_sound_effects) on the timeline at a second, on the bottom audio track. The file is added to the project's media the first time and reused after.",
-      inputSchema: z.object({ effectId: z.string().min(1).max(64), at, volume, projectId }),
+        [
+          "Puts a built-in sound effect (an id from list_sound_effects) on the timeline at a second, on the bottom audio track. The file is added to the project's media the first time and reused after.",
+          "Two sounds at the same moment (a whoosh and a shutter) go on separate audio tracks on their own with track \"auto\".",
+          "`trimStart` and `duration` play one slice of the file: a burst of clicks (a shutter) is trimmed to one click with trimStart 0, duration 0.16.",
+        ].join(" "),
+      inputSchema: z.object({
+        effectId: z.string().min(1).max(64),
+        at,
+        volume,
+        trimStart: z.number().min(0).max(60).optional().describe("Seconds into the sound to start from. Default 0."),
+        duration: z.number().min(0.03).max(60).optional().describe("Seconds to play. Default: the rest of the sound."),
+        track: trackChoice,
+        projectId,
+      }),
     },
-    handled(async ({ effectId, at, volume, projectId }: { effectId: string; at: number; volume: number; projectId?: string }, ctx) => {
+    handled(async ({ effectId, projectId, ...place }: Placement & { effectId: string; projectId?: string }, ctx) => {
       const effect = findSoundEffect(effectId)
       if (!effect) throw new AgentError(`No sound effect "${effectId}". list_sound_effects shows the ids.`)
       const userId = agentUserId(ctx)
@@ -98,7 +113,7 @@ export function registerSoundTools(server: McpServer) {
       const name = `sfx · ${effect.name}.${effect.file.split(".").pop()}`
       const existing = (await listMedia(project.id)).find((media) => media.kind === "audio" && media.name === name)
       const mediaId = existing?.id ?? (await addSound(userId, project, await readFile(path.join(process.cwd(), "public", "sfx", effect.file)), name))
-      return text(`Added ${await placeSound(userId, project, mediaId, at, volume)}.`)
+      return text(`Added ${await placeSound(userId, project, mediaId, place)}.`)
     })
   )
 
@@ -129,7 +144,7 @@ export function registerSoundTools(server: McpServer) {
       const project = await resolveProject(userId, input.projectId)
       const mediaId = await addSound(userId, project, bytes, `made · ${input.name}.${type}`)
       if (input.at === undefined) return text(`Added the sound to the project's media as ${mediaId}. Place it with add_clip (kind "media").`)
-      return text(`Added ${await placeSound(userId, project, mediaId, input.at, input.volume)} (mediaId ${mediaId}).`)
+      return text(`Added ${await placeSound(userId, project, mediaId, { at: input.at, volume: input.volume })} (mediaId ${mediaId}).`)
     })
   )
 }
