@@ -48,12 +48,21 @@ export async function uploadFromUrl(url: string, name: string, userId: string, p
     throw new AgentError("That isn't a valid URL.")
   }
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new AgentError("Only http(s) URLs can be added.")
+  return uploadToImageKit(parsed.href, name, userId, projectId, "ImageKit couldn't fetch that file")
+}
 
+/** Uploads a file's bytes (a sound effect from the library, or one the agent made). */
+export function uploadBytes(bytes: Buffer, name: string, userId: string, projectId: string): Promise<CreateMediaInput> {
+  return uploadToImageKit(bytes.toString("base64"), name, userId, projectId, "ImageKit couldn't store that file")
+}
+
+/** `file` is a URL for ImageKit to fetch, or the file's bytes in base64 (both are what its upload API takes). */
+async function uploadToImageKit(file: string, name: string, userId: string, projectId: string, failure: string): Promise<CreateMediaInput> {
   const privateKey = process.env.IMAGEKIT_PRIVATE_KEY
   if (!privateKey) throw new AgentError("ImageKit isn't configured on the server.")
 
   const form = new FormData()
-  form.set("file", parsed.href)
+  form.set("file", file)
   form.set("fileName", name)
   form.set("folder", `/motion/${userId}/${projectId}/`)
   form.set("useUniqueFileName", "true")
@@ -65,7 +74,7 @@ export async function uploadFromUrl(url: string, name: string, userId: string, p
   })
   const result = (await response.json().catch(() => ({}))) as UploadResponse
   if (!response.ok || !result.fileId || !result.url || !result.filePath) {
-    throw new AgentError(`ImageKit couldn't fetch that file: ${result.message ?? response.statusText}. Use a direct file URL (not a web page).`)
+    throw new AgentError(`${failure}: ${result.message ?? response.statusText}. If it was a URL, use a direct file URL (not a web page).`)
   }
 
   const kind = kindOf(result)

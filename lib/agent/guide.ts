@@ -183,7 +183,8 @@ const recipes = () => `# Recipes
 - **Lower thirds:** Bar Lower Third / Pill Name Tag in the first 10 s, 3–5 s, name + role.
 - **Pacing:** something changes every 2–4 s in short videos (cut, caption, b-roll, zoom), every 5–10 s in long ones.
 - **Safe zones:** 9:16: text between 18% and 75% down, 6% side margins. 16:9: 5% margins, captions above the bottom 10%.
-- **SFX on hits:** a short whoosh/pop (≤ 0.5 s, volume 0.15–0.3) on the bottom track, starting on the cut or pop-in it accents. Never over important speech.
+- **SFX on hits:** a short whoosh/pop (≤ 0.5 s, volume 0.15–0.3) on the bottom track, starting on the cut or pop-in it accents. Never over important speech. \`list_sound_effects\` shows the built-in library (wooshes, risers, clicks, pops, hits, chimes, typing, shutter, recorded samples); \`add_sound_effect({ effectId, at, volume })\` places one.
+- **Make a sound with code** when nothing in the library fits: write a short WAV with a small script (Node or Python; 44.1 kHz, mono, 16-bit, under 2 MB and 15 s) and send it with \`upload_sound({ name, data: <base64>, at })\`. Recipes: a click is a 3–8 ms burst of noise or a 2–4 kHz tone with a fast decay; a pop is a sine falling from about 600 to 150 Hz over 60 ms; a whoosh is noise through a band-pass whose centre sweeps 300 → 3000 Hz while its level rises then falls over 0.3–0.8 s; a riser is a sine or saw sweeping up an octave or two over 1–2 s with rising level; a soft hit is a 50–80 Hz sine with a 300 ms decay under a short click; a beat is one WAV with a kick on every beat (at 120 BPM every 0.5 s), placed once. Fade each end over a few ms so it doesn't click, and name it for what it is.
 - **B-roll:** volume 0 under speech; full screen, or a rounded card (radius 32–48) on a Solid Colour backdrop.`
 
 /** The guide (or one topic of it) as Markdown. */

@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
     agentFeedback: true,
   },
   cacheComponents: true,
+  // add_sound_effect reads the library's files on the server, so they ship with the MCP route.
+  outputFileTracingIncludes: {
+    "/api/mcp": ["./public/sfx/**/*"],
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {
