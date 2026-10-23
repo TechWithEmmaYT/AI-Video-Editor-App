@@ -93,7 +93,7 @@ const workflow = () => `# Editing workflow
 
 1. **Orient:** \`get_selection\` → \`get_project\` (tracks, clips, ids, times).
 2. **See and hear:** \`list_media\`; \`get_media\` on videos (contact sheet with timestamps); \`get_media_transcript\` for speech (word timings when ImageKit made it). If the timeline already has clips, \`render_frames\` shows how it looks now.
-3. **Find references on Pinterest first.** Search for edits like the one asked for (see \`get_guide({ topic: "assets" })\`), open 2–3 good ones and note what they do: caption size and place, colours, how often it cuts, how cards enter. Match that.
+3. **Find references on Pinterest first, before you plan.** Search for edits like the one asked for (see \`get_guide({ topic: "assets" })\`), open 2–3 good ones and note what they do: caption size and place, colours, how often it cuts, how cards enter. Match that.
 4. **Plan** against the timeline: which track, which seconds. Prefer a brief (\`get_guide({ topic: "briefs" })\`) when the request matches a style.
 5. **Edit** with \`add_clip\` / \`update_clip\` / \`delete_clip\` (seconds; \`track: "auto"\` picks a sensible track).
 6. **Look, fix, repeat.** This is a loop, not one check:
@@ -163,6 +163,7 @@ Before you design any look (captions, cards, b-roll, pacing), look for reference
 - Search: https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed, changing the \`q=\` words to what you need, e.g. "reel captions", "talking head reel edit", "youtube video editing style", "product ad video".
 - Open 2–3 strong pins and note what they do (caption size, place and colours, cut rhythm, how cards enter). Then compare your \`render_frames\` against them.
 - Only if Pinterest has nothing useful, use other sources.
+- If Pinterest asks you to sign in, use a browser where the user is already signed in, or ask the user to sign in there. Never ask for or keep a password.
 - ${REEL_REFERENCES[0]}
 
 ## Files
@@ -173,13 +174,21 @@ Before you design any look (captions, cards, b-roll, pacing), look for reference
 
 const recipes = () => `# Recipes
 
-- **Modern captions for Reels, TikTok and Shorts:** \`add_captions\` with \`look: "lead-in"\` (a faint lead-in line over one big key word on a red box), \`"accent"\` (white words, the key word purple with a line drawing on under it) or \`"heavy-fill"\` (huge heavy words in a soft pink wash, a rare shock word in red). One key word per phrase. Briefs: \`brief:lead-in-reel\`, \`brief:accent-reel\`, \`brief:heavy-fill-reel\`.
+- **Captions: references first, never a copy.** Before you caption, look at your Pinterest references for this kind of video. Then pick the look that matches them and set its colours from the video: the accents must suit the footage (skin, background, brand) and read on it. Don't reuse an earlier project's style or a look's default colours just because they're there.
+- **Default for 9:16: crisp.** \`add_captions\` with no \`look\` on a 9:16 project uses \`"crisp"\`: Montserrat 700, lowercase, a little tight, white, the key word in a warm accent (\`emphasisColor\`), a soft shadow, no box, words popping in on their timings, 1–4 words per caption. Mark only the 5–8 payoff words of the whole video as \`~word~\` (the punch accent, \`accentColor\`), and the 3–4 words that carry the core idea as \`_word_\` (Playfair Display italic, 1.35×, \`serifColor\`). Three colour tiers, never more. A word too wide for the box shrinks instead of being cut off. Brief: \`brief:crisp-reel\`.
+- **Caption safe zone (9:16):** x 64, y 1020, width 952, height 400 on 1080×1920 (between 53% and 74% down): below the face, above the app's buttons. \`add_captions\` puts crisp there; \`render_frames\` flags captions outside it.
+- **Other Modern looks:** \`add_captions\` with \`look: "lead-in"\` (a faint lead-in line over one big key word on a red box), \`"accent"\` (white words, the key word purple with a line drawing on under it) or \`"heavy-fill"\` (huge heavy words in a soft pink wash, a rare shock word in red). One key word per phrase. Briefs: \`brief:lead-in-reel\`, \`brief:accent-reel\`, \`brief:heavy-fill-reel\`.
 - **Kinetic captions:** Kinetic Caption element, 1–4 words, \`*word*\` for one emphasis word, \`times\` from the transcript's word timings. Never shorter than 0.6 s.
 - **Pop-in callouts / stickers:** Badge Pop / Highlight Box / Arrow Pointer, 1.5–3 s, entering on the word that mentions them.
 - **Lower thirds:** Bar Lower Third / Pill Name Tag in the first 10 s, 3–5 s, name + role.
 - **Pacing:** something changes every 2–4 s in short videos (cut, caption, b-roll, zoom), every 5–10 s in long ones.
 - **Safe zones:** 9:16: text between 18% and 75% down, 6% side margins. 16:9: 5% margins, captions above the bottom 10%.
-- **SFX on hits:** a short whoosh/pop (≤ 0.5 s, volume 0.15–0.3) on the bottom track, starting on the cut or pop-in it accents. Never over important speech.
+- **SFX on hits:** a short whoosh/pop (≤ 0.5 s, volume 0.15–0.3) on the bottom track, starting on the cut or pop-in it accents. Never over important speech. \`list_sound_effects\` shows the built-in library (wooshes, risers, clicks, pops, hits, chimes, typing, shutter, recorded samples); \`add_sound_effect({ effectId, at, volume })\` places one.
+- **Layer the sound of a cut:** a whoosh (volume ~0.22) starting 0.15 s **before** the cut (the movement into it), then the shutter (0.32–0.5) or a pop (0.32) exactly **on** it (the arrival). Two sounds at one moment land on separate audio tracks on their own. \`trimStart\` and \`duration\` on \`add_sound_effect\` play one slice of a file: a recording with a burst of clicks is trimmed to one, \`trimStart: 0, duration: 0.16\`.
+- **Music under a voice:** volume ~0.045, \`fadeIn: 2\`, \`fadeOut: 3\` (update_clip). If you can name the track while the voice talks, it's too loud. Match the message: a serious script wants a sparse sustained pad, not a beat.
+- **Shutter cuts (reels):** a **Shutter Open** element (0.45 s) at 0:00 on the top track, and a **Shutter Cut** (0.36 s) starting 0.18 s before each full-screen cutaway's cut, so it's shut on the cut.
+- **Punch-ins (talking heads):** split the speaker at sentences and change \`scale\` per part (cuts, not moves): the hook starts at 1.22 with \`animateIn: "scale"\`, 7 frames; then alternate 1.0–1.16 every 3–6 s, the tightest on the most important line.
+- **Make a sound with code** when nothing in the library fits: write a short WAV with a small script (Node or Python; 44.1 kHz, mono, 16-bit, under 2 MB and 15 s) and send it with \`upload_sound({ name, data: <base64>, at })\`. Recipes: a click is a 3–8 ms burst of noise or a 2–4 kHz tone with a fast decay; a pop is a sine falling from about 600 to 150 Hz over 60 ms; a whoosh is noise through a band-pass whose centre sweeps 300 → 3000 Hz while its level rises then falls over 0.3–0.8 s; a riser is a sine or saw sweeping up an octave or two over 1–2 s with rising level; a soft hit is a 50–80 Hz sine with a 300 ms decay under a short click; a beat is one WAV with a kick on every beat (at 120 BPM every 0.5 s), placed once. Fade each end over a few ms so it doesn't click, and name it for what it is.
 - **B-roll:** volume 0 under speech; full screen, or a rounded card (radius 32–48) on a Solid Colour backdrop.`
 
 /** The guide (or one topic of it) as Markdown. */

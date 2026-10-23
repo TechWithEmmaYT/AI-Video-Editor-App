@@ -5,6 +5,7 @@ import { ScanIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react"
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "cn"
 
+import { captionSafeBox } from "@/lib/agent/frames"
 import { clipEnd } from "@/lib/project/edit"
 import { Main, type MainProps } from "@/remotion/main"
 import { useEditorStore, useSelectedClip } from "@/stores/editor-store"
@@ -82,6 +83,7 @@ export function Canvas() {
               moveToBeginningWhenEnded={false}
               acknowledgeRemotionLicense
             />
+            <CaptionSafeZone scale={scale} />
             <SelectionOutline scale={scale} />
           </div>
         </div>
@@ -155,6 +157,26 @@ function usePlayerSync() {
   }, [player, setPlayer, setFrame, setPlaying])
 
   return playerRef
+}
+
+/** While a caption is selected in a 9:16 video: the caption safe zone, as a dashed box. */
+function CaptionSafeZone({ scale }: { scale: number }) {
+  const clip = useSelectedClip()
+  const format = useEditorStore((state) => state.format)
+  const width = useEditorStore((state) => state.width)
+  const height = useEditorStore((state) => state.height)
+  const isCaption = clip?.type === "code" && !!clip.elementId?.endsWith("-caption")
+  if (!isCaption || format !== "9:16") return null
+
+  const safe = captionSafeBox(width, height)
+  return (
+    <div
+      className="pointer-events-none absolute rounded-[3px] border border-dashed border-white/60"
+      style={{ left: safe.x * scale, top: safe.y * scale, width: safe.width * scale, height: safe.height * scale }}
+    >
+      <span className="absolute -top-5 left-0 text-[10px] text-white/70">Caption safe zone</span>
+    </div>
+  )
 }
 
 /** Outlines the selected clip while it's on screen (no canvas dragging in v1). */

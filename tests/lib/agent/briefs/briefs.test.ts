@@ -10,7 +10,7 @@ describe("briefs", () => {
     for (const id of brief.elements) expect(findBuiltinElement(id), id).toBeDefined()
     // Every element named in the body by its display name exists too.
     for (const id of brief.elements) expect(brief.body).toContain(findBuiltinElement(id)!.name)
-    for (const family of ["Inter", "Playfair Display", "Inter Tight", "Poppins", "Instrument Serif"]) {
+    for (const family of ["Inter", "Playfair Display", "Inter Tight", "Poppins", "Instrument Serif", "Montserrat"]) {
       if (brief.body.includes(family)) expect(findFont(family), family).toBeDefined()
     }
   })
@@ -25,6 +25,7 @@ describe("briefs", () => {
 
 describe("Modern reel briefs", () => {
   it.each([
+    ["crisp-reel", "crisp-caption", "crisp"],
     ["lead-in-reel", "lead-in-caption", "lead-in"],
     ["accent-reel", "accent-caption", "accent"],
     ["heavy-fill-reel", "heavy-caption", "heavy-fill"],
@@ -37,8 +38,17 @@ describe("Modern reel briefs", () => {
     expect(brief.body).toContain("https://www.pinterest.com/search/pins/?q=reel%20short&rs=typed")
   })
 
+  it("crisp-reel carries the edit spec: punch-ins, shutter cuts, layered sound and the sound tools", () => {
+    const brief = findBrief("crisp-reel")!
+    expect(brief.body).toContain("`scale: 1.22` with `animateIn: \"scale\"`")
+    expect(brief.body).toContain("**0.18 s before the cut**")
+    expect(brief.body).toContain("`trimStart: 0, duration: 0.16`")
+    expect(brief.body).toContain("volume 0.045")
+    expect(brief.tools).toEqual(expect.arrayContaining(["add_sound_effect", "split_clip", "render_frames"]))
+  })
+
   it("come first in the list, before the classic looks", () => {
-    expect(BRIEFS.slice(0, 3).map((b) => b.id)).toEqual(["lead-in-reel", "accent-reel", "heavy-fill-reel"])
+    expect(BRIEFS.slice(0, 4).map((b) => b.id)).toEqual(["crisp-reel", "lead-in-reel", "accent-reel", "heavy-fill-reel"])
   })
 })
 

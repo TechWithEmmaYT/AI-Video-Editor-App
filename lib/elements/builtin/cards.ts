@@ -247,3 +247,79 @@ if (String(p.author).trim()) {
   ctx.restore()
 }`,
 }
+
+/**
+ * A dark list for a reel, in the crisp captions' palette: each item's empty box springs in, then
+ * its label slides in after it. Dark on purpose: a white card blows out against dark footage.
+ */
+export const darkListCard: ElementDef = {
+  id: "dark-list-card",
+  name: "Dark List Card",
+  category: "callouts",
+  layout: "callout",
+  defaultDurationInFrames: 90,
+  fonts: ["Montserrat"],
+  paramSchema: [
+    { key: "title", label: "Title", type: "text", default: "three things" },
+    { key: "items", label: "Items (comma-separated)", type: "text", default: "write, ship, repeat" },
+    { key: "stagger", label: "Seconds between items", type: "number", default: 0.5, min: 0.05, max: 3, step: 0.05 },
+    { key: "font", label: "Font", type: "font", default: "Montserrat" },
+    { key: "bg", label: "Background", type: "color", default: "#0d0d0d" },
+    { key: "color", label: "Item colour", type: "color", default: "#ffffff" },
+    { key: "accent", label: "Title colour", type: "color", default: "#ead9b0" },
+    { key: "line", label: "Line colour", type: "color", default: "#3d3d3d" },
+  ],
+  defaultParams: {},
+  createdBy: "builtin",
+  code: `const pad = w * 0.085
+ctx.fillStyle = p.bg
+ctx.fillRect(0, 0, w, h)
+
+const hair = Math.max(1, h * 0.0016)
+ctx.strokeStyle = p.line
+ctx.lineWidth = hair
+ctx.strokeRect(hair / 2, hair / 2, w - hair, h - hair)
+
+ctx.textBaseline = "alphabetic"
+ctx.textAlign = "left"
+
+ctx.font = M.font(p.font, 800, h * 0.05)
+ctx.fillStyle = p.accent
+ctx.globalAlpha = M.clamp(t / 0.25)
+ctx.fillText(String(p.title).toLowerCase(), pad, h * 0.16)
+ctx.globalAlpha = 1
+
+const items = String(p.items).split(",").map((s) => s.trim()).filter(Boolean)
+const itemSize = h * 0.085
+const boxSize = itemSize * 0.74
+const top = h * 0.33
+const gap = (h * 0.52) / Math.max(1, items.length)
+
+items.forEach((label, i) => {
+  const start = 0.2 + i * p.stagger
+  const kBox = M.clamp((t - start) / 0.3)
+  if (kBox <= 0) return
+  const kTxt = M.clamp((t - start - 0.08) / 0.34)
+  const y = top + gap * i
+
+  const bs = M.ease.outBack(kBox)
+  ctx.save()
+  ctx.translate(pad + boxSize / 2, y - boxSize * 0.8 + boxSize / 2)
+  ctx.scale(bs, bs)
+  ctx.globalAlpha = M.clamp(kBox * 2)
+  ctx.strokeStyle = p.line
+  ctx.lineWidth = Math.max(2, h * 0.0045)
+  M.roundRect(ctx, -boxSize / 2, -boxSize / 2, boxSize, boxSize, boxSize * 0.2)
+  ctx.stroke()
+  ctx.restore()
+
+  if (kTxt > 0) {
+    const e = M.ease.outCubic(kTxt)
+    ctx.globalAlpha = e
+    ctx.font = M.font(p.font, 800, itemSize)
+    ctx.fillStyle = p.color
+    ctx.fillText(label.toLowerCase(), pad + boxSize * 1.6 - (1 - e) * w * 0.05, y)
+    ctx.globalAlpha = 1
+  }
+})`,
+}

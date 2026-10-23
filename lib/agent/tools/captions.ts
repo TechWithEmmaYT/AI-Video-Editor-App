@@ -8,6 +8,7 @@ import { markEmphasis, splitPhrases, wordsIn } from "@/lib/agent/captions"
 import { addClipOps } from "@/lib/agent/clip-spec"
 import { AgentError, agentUserId, handled, text } from "@/lib/agent/context"
 import { resolveProject } from "@/lib/agent/resolve"
+import { captionSafeBox } from "@/lib/agent/frames"
 import { findBuiltinElement } from "@/lib/elements/builtin"
 import { getUserMedia } from "@/lib/media-transcript"
 import { MAX_SECONDS } from "@/lib/project/formats"
@@ -19,6 +20,7 @@ const MAX_PHRASES = 240
 
 /** Each `look` and the caption element that draws it. The Modern looks come first. */
 const CAPTION_LOOKS = {
+  crisp: "crisp-caption",
   "lead-in": "lead-in-caption",
   accent: "accent-caption",
   "heavy-fill": "heavy-caption",
@@ -35,8 +37,8 @@ export function registerCaptionTools(server: McpServer) {
       description: [
         "Lays a caption clip for every phrase in a media file's transcript, with each word's time filled in — the whole caption track in one call, instead of one add_clip per phrase.",
         "Needs a transcript on the media file (get_media_transcript shows whether there is one).",
-        "`look` picks the caption element. The Modern looks, for Reels, TikTok and Shorts: \"lead-in\" (a small faint line of the lesser words over the key word, big on a red box), \"accent\" (white Poppins with the key word in purple and a line drawing on under it), \"heavy-fill\" (huge tight heavy type in a soft pink wash filling the width, the key word in solid red). Then \"kinetic\", the Kinetic Caption, which is the default.",
-        "`style` overrides that element's params, set the same on every caption. get_guide({ topic: \"briefs\" }) gives the style for an edit.",
+        "`look` picks the caption element. The Modern looks, for Reels, TikTok and Shorts: \"crisp\" (the default for 9:16: Montserrat Bold, lowercase and a little tight, white with the key word in a warm accent, a soft shadow, words popping in on their timings, in the caption safe zone), \"lead-in\" (a small faint line of the lesser words over the key word, big on a red box), \"accent\" (white Poppins with the key word in purple and a line drawing on under it), \"heavy-fill\" (huge tight heavy type in a soft pink wash filling the width, the key word in solid red). Then \"kinetic\", the Kinetic Caption, the default for 16:9 and 1:1.",
+        "`style` overrides that element's params, set the same on every caption. Pick the accent colours from the video and your reference (emphasisColor for the key word, accentColor for the rare ~punch~ word), never just the defaults. get_guide({ topic: \"briefs\" }) gives the style for an edit.",
         "Returns how many captions it added and the range they cover.",
       ].join(" "),
       inputSchema: z.object({
@@ -54,15 +56,15 @@ export function registerCaptionTools(server: McpServer) {
         pauseSeconds: z.number().min(0.05).max(2).default(0.45).describe("A gap this long or longer always ends a phrase."),
         emphasis: z.boolean().default(true).describe("Mark one word per phrase as the emphasis word."),
         look: z
-          .enum(["lead-in", "accent", "heavy-fill", "kinetic"])
-          .default("kinetic")
-          .describe('Modern: "lead-in", "accent", "heavy-fill". Classic: "kinetic" (the Kinetic Caption, the default).'),
+          .enum(["crisp", "lead-in", "accent", "heavy-fill", "kinetic"])
+          .optional()
+          .describe('Modern: "crisp", "lead-in", "accent", "heavy-fill". Classic: "kinetic". Default: "crisp" for 9:16, "kinetic" otherwise.'),
         style: z.record(z.string(), z.unknown()).default({}).describe("Caption params to override: font, weight, color, mode, highlight, animation…"),
         box: z
           .object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() })
           .partial()
           .optional()
-          .describe("Where the captions sit. Default: mid-screen, 24% of the height tall (30% for heavy-fill) for the Modern looks, the top third for kinetic."),
+          .describe("Where the captions sit. Default: crisp in the caption safe zone (x 6%, y 53%, width 88%, height 21%: clear of the face and of the app's buttons), the other Modern looks mid-screen, kinetic the top third."),
         track: z.union([z.enum(["auto", "new-top"]), z.string().min(1).max(64)]).default("new-top").describe("All the captions go on this one track."),
         projectId: z.string().min(1).max(64).optional().describe("Defaults to the project open in the editor."),
       }),
@@ -78,7 +80,7 @@ export function registerCaptionTools(server: McpServer) {
           linesPerPhrase: number
           pauseSeconds: number
           emphasis: boolean
-          look: CaptionLook
+          look?: CaptionLook
           style: Record<string, unknown>
           box?: { x?: number; y?: number; width?: number; height?: number }
           track: string
@@ -125,21 +127,25 @@ export function registerCaptionTools(server: McpServer) {
           )
         }
 
-        const element = findBuiltinElement(CAPTION_LOOKS[input.look])
-        if (!element) throw new AgentError(`The caption element for the "${input.look}" look is missing.`)
+        const look = input.look ?? (project.format === "9:16" ? "crisp" : "kinetic")
+        const element = findBuiltinElement(CAPTION_LOOKS[look])
+        if (!element) throw new AgentError(`The caption element for the "${look}" look is missing.`)
 
-        // The Modern looks sit mid-screen, and need the height for a big key word; heavy fill the most.
-        const tall = input.look === "heavy-fill" ? 0.3 : 0.24
+        // Crisp sits in the caption safe zone; the other Modern looks mid-screen, with the height for a
+        // big key word (heavy fill the most).
+        const tall = look === "heavy-fill" ? 0.3 : 0.24
         const box =
           input.box ??
-          (input.look === "kinetic"
-            ? undefined
-            : {
-                x: Math.round(project.width * 0.06),
-                y: Math.round(project.height * (0.48 - tall / 2)),
-                width: Math.round(project.width * 0.88),
-                height: Math.round(project.height * tall),
-              })
+          (look === "crisp"
+            ? captionSafeBox(project.width, project.height)
+            : look === "kinetic"
+              ? undefined
+              : {
+                  x: Math.round(project.width * 0.06),
+                  y: Math.round(project.height * (0.48 - tall / 2)),
+                  width: Math.round(project.width * 0.88),
+                  height: Math.round(project.height * tall),
+                })
 
         // Source second → timeline second, through the clip that plays the file.
         const onTimeline = (sourceSeconds: number) => (speaker.from - trimStart) / project.fps + sourceSeconds

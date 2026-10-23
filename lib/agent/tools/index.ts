@@ -10,6 +10,7 @@ import { registerGuideTool } from "@/lib/agent/tools/guide"
 import { registerMediaTools } from "@/lib/agent/tools/media"
 import { registerProjectTools } from "@/lib/agent/tools/projects"
 import { registerSectionTools } from "@/lib/agent/tools/sections"
+import { registerSoundTools } from "@/lib/agent/tools/sounds"
 
 /** Every tool Claude Code gets over MCP (see the plan, §8). The guide lists whatever is registered here. */
 export function registerAgentTools(server: McpServer) {
@@ -35,4 +36,5 @@ export function registerAgentTools(server: McpServer) {
   registerSectionTools(recording)
   registerElementTools(recording)
   registerFrameTools(recording)
+  registerSoundTools(recording)
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { compileCode } from "@/lib/code-clips/compile"
 import { createHelpers } from "@/lib/code-clips/helpers"
 import { resolveParams } from "@/lib/code-clips/params"
-import { accentCaption, heavyCaption, kineticCaption, leadInCaption } from "@/lib/elements/builtin/captions"
+import { accentCaption, crispCaption, heavyCaption, kineticCaption, leadInCaption } from "@/lib/elements/builtin/captions"
 import type { ElementDef } from "@/lib/elements/types"
 
 /** Draws one frame and returns the words drawn, with the colour, font, opacity and filter each was drawn in. */
@@ -100,5 +100,35 @@ describe("Modern caption looks", () => {
   it("leaves the Kinetic Caption's own look as it was", () => {
     const words = drawnAt(1, 0.66, { text: "make it *move*", times: "0, 0.3, 0.6" })
     expect(words.map((w) => [w.alpha, w.filter, w.spacing])).toEqual([[1, "none", "0px"], [1, "none", "0px"], [1, "none", "0px"]])
+  })
+})
+
+describe("Modern · Crisp", () => {
+  it("is lowercase Montserrat 700, with the key word in the warm accent and the punch word in lime", () => {
+    const words = drawnAt(2, 0.9, { text: "This is *Huge* ~now~", times: "0, 0.2, 0.4, 0.6" }, crispCaption)
+    expect(words.map((w) => w.text)).toEqual(["this", "is", "huge", "now"])
+    expect(words[0]).toMatchObject({ color: "#ffffff" })
+    expect(words[0].font).toMatch(/^normal 700 .*Montserrat/)
+    expect(words[2].color).toBe("#ead9b0")
+    expect(words[3].color).toBe("#ccff00")
+    expect(words[3].font).toMatch(/^normal 700 /)
+  })
+
+  it("grows a long key word less, so it stays inside the frame", () => {
+    const at = (word: string) => {
+      const words = drawnAt(2, 0.9, { text: `so *${word}*`, times: "0, 0.2" }, crispCaption)
+      return sizeOf(words[1].font) / sizeOf(words[0].font)
+    }
+    expect(at("short")).toBeCloseTo(1.3)
+    expect(at("complete")).toBeCloseTo(1.15)
+    expect(at("opportunity.")).toBeCloseTo(1)
+  })
+
+  it("draws a _serif_ word in lime Playfair Display italic, a little larger", () => {
+    const words = drawnAt(2, 0.9, { text: "the _future_ is here", times: "0, 0.2, 0.4, 0.6" }, crispCaption)
+    expect(words[1].text).toBe("future")
+    expect(words[1].color).toBe("#ccff00")
+    expect(words[1].font).toMatch(/^italic 700 .*Playfair Display/)
+    expect(sizeOf(words[1].font) / sizeOf(words[0].font)).toBeCloseTo(1.35)
   })
 })
