@@ -4,6 +4,8 @@
 
 If you intend to generate revenue using our intellectual property, you are required to obtain a valid license. A free license is included when you purchase the codebase. Below are instances where a license is required:
 
+
+
 - Operating as a business entity
 - Deploying the project as a Software as a Service (SaaS)
 - Generating any form of income using the codebase
