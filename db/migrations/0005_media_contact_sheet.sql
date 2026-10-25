@@ -1,0 +1,1 @@
+ALTER TABLE "media" ADD COLUMN "contact_sheet_url" text;

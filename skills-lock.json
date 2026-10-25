@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "plan-project": {
+      "source": "TechWithEmmaYT/TechwithEmma-Skills",
+      "sourceType": "github",
+      "skillPath": "skills/plan-project/SKILL.md",
+      "computedHash": "43249ce110dd57bb15325c504b98f7ce58f54ce5b37414f3e86a70e959b38d1b"
+    },
+    "remotion-best-practices": {
+      "source": "remotion-dev/skills",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-best-practices/SKILL.md",
+      "computedHash": "299c7f56f80e01847da06d9fa14825adbe0b30ef5fe31c99b749213063e85e10"
+    },
+    "remotion-captions": {
+      "source": "remotion-dev/skills",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-captions/SKILL.md",
+      "computedHash": "71bfad54e60226267ae14650c2798c975df6eb9da82945d8670f84c57abffcf8"
+    },
+    "remotion-create": {
+      "source": "remotion-dev/skills",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-create/SKILL.md",
+      "computedHash": "7cdad7ac4603b3ba70446948c5c9b17699c2203ab226458535ecfd828e3c8180"
+    },
+    "remotion-docs": {
+      "source": "remotion-dev/skills",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-docs/SKILL.md",
+      "computedHash": "1e9c15c18090acafb6bd5a4201136e7c415a3c00e867422f2038a480be74a27a"
+    },
+    "remotion-render": {
+      "source": "remotion-dev/skills",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-render/SKILL.md",
+      "computedHash": "935e84345a518ffa2cc97445c196bf73c1500746626ac7937f6dac9bca6d74ac"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "6b526d013e28073246a36f99b529bc43745d30832ecfa8217b359c34f260ca6b"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "claude_status" ADD COLUMN "key_id" text;
