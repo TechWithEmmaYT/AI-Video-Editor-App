@@ -13,7 +13,6 @@ Media uploads, video playback, thumbnails, transcripts, HLS streaming and export
 ## ❤️ Support the Channel
 
 Love this project? Here’s how you can support:
-
 * ☕ [Buy Me a Coffee](https://buymeacoffee.com/techwithemmaofficial)
 * 🌟 Star this repo
 * 🎥 [Subscribe on YouTube](https://tinyurl.com/subcribe-to-techwithEmma)
@@ -39,7 +38,7 @@ Love this project? Here’s how you can support:
 * 🤖 Claude Code MCP Server
 * 🔑 API Keys
 * 🧠 AI Edits Live in the Editor
-* 🎬 Edit Styles (Reels, Talking Head, Long Form)
+* 🎬 Edit Styles (1 free, all in the Extended Version)
 * 🔴 Realtime Updates
 * 📤 MP4 Export (Trigger.dev)
 * 📡 HLS Streaming
@@ -58,6 +57,18 @@ Love this project? Here’s how you can support:
 
 * 📝 [Prompts](https://docs.google.com/document/d/1Reps6YqBUEYaUJIjRwVJBBrThQw2rm94RCx5LhRjROY/edit?usp=sharing)
 * 🎨 [Designs](https://drive.google.com/drive/folders/1gLstGsmp1rlrbYR57-a1TB25R7aPIDhd?usp=sharing)
+
+### 🚀 Step 3: Get the Extended Version — All Editing Styles, Full Source Code & More
+
+This free version comes with one editing style (Reel Captions + B-roll). Get every style Claude can edit with, plus everything you need to run it.
+👉 [Get the Extended Version](https://trymockshot.com/r/ai-video-editor)
+
+* 🎬 All Editing Styles — Long Form, Crisp, Lead-in, Accent, Heavy Fill & more... 
+* 🔑 Complete .env Setup
+* 💻 Setup Video (Run Locally)
+* 📦 Complete Full Source Code
+* 📜 Commercial License
+* 🤝 Plus Support
 
 ## 📜 License Information
 
