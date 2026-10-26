@@ -1,7 +1,7 @@
 # 🎬 motion — AI Video Editor with a Claude Code MCP Server
 
 > This code, whether in parts or whole, is licensed for commercial use **only with a license**. It is **free for personal use**.
-> 👉 [Click here to obtain license](https://trymockshot.com/r/ai-video-editor) and 👉 [here to learn more](./TECHWITHEMMA-LICENSE.md)
+> 👉 [Click here to obtain license](https://trymockshot.com/r/ai-video-editor/extended) and 👉 [here to learn more](./TECHWITHEMMA-LICENSE.md)
 
 
 ## 💛 Sponsored by ImageKit
@@ -61,7 +61,7 @@ Love this project? Here’s how you can support:
 ### 🚀 Step 3: Get the Extended Version — All Editing Styles, Full Source Code & More
 
 This free version comes with one editing style (Reel Captions + B-roll). Get every style Claude can edit with, plus everything you need to run it.
-👉 [Get the Extended Version](https://trymockshot.com/r/ai-video-editor)
+👉 [Get the Extended Version](https://trymockshot.com/r/ai-video-editor/extended)
 
 * 🎬 All Editing Styles — Long Form, Crisp, Lead-in, Accent, Heavy Fill & more... 
 * 🔑 Complete .env Setup
@@ -72,7 +72,7 @@ This free version comes with one editing style (Reel Captions + B-roll). Get eve
 
 ## 📜 License Information
 
-A paid license is required for commercial use. To obtain a commercial license, please visit 👉 [Here](https://trymockshot.com/r/ai-video-editor)
+A paid license is required for commercial use. To obtain a commercial license, please visit 👉 [Here](https://trymockshot.com/r/ai-video-editor/extended)
 
 For more details about license, please refer to the [TECHWITHEMMA-LICENSE.md](./TECHWITHEMMA-LICENSE.md).
 

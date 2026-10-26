@@ -6,7 +6,7 @@ import type { Brief } from "@/lib/agent/briefs/types"
  *
  * This free version includes one style: Reel captions + b-roll.
  * 🔒 Get the complete set of styles (Crisp, Lead-in, Accent more..
- * UI Explainer, Long Form and more) with a paid license: https://trymockshot.com/r/ai-video-editor
+ * UI Explainer, Long Form and more) with a paid license: https://trymockshot.com/r/ai-video-editor/extended
  */
 export const BRIEFS: Brief[] = [reelCaptions]
 
