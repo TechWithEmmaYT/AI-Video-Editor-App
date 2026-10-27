@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mockshot": {
+      "type": "http",
+      "url": "https://dev.trymockshot.com/api/mcp/all",
+      "headers": {
+        "Authorization": "Bearer ${MOCKSHOT_API_KEY}"
+      }
+    }
+  }
+}
